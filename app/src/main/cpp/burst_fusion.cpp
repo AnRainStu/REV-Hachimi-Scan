@@ -104,7 +104,7 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
 
     size_t numFrames = alignedFrames.size();
     
-    // MotoCam 启发的核心调优参数：
+    // 多帧配准核心调优参数：
     // GHOST_SUM_CHECK: 判定为鬼影/错位的局部像素色差阈值 (0-255)
     const int GHOST_DIFF_THRESHOLD = 22;
 
