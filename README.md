@@ -115,7 +115,7 @@ This project utilizes a tiered licensing policy:
 
 ## 🤖 Acknowledgments
 
-This project was developed through collaborative pair programming (vibe coding) between the author and **[Google Antigravity](https://deepmind.google)** (Advanced Agentic Coding AI), covering the entire native C++ NDK image processing pipeline and Jetpack Compose modern UI.
+This project was developed through collaborative vibe coding with **[Google Antigravity](https://deepmind.google)**, covering the entire native C++ NDK image processing pipeline and Jetpack Compose modern UI.
 
 ---
 
@@ -123,7 +123,7 @@ This project was developed through collaborative pair programming (vibe coding) 
 
 1. **Regarding "Hachimi"**:
    - "Hachimi" is a popular internet community meme. Within the Chinese AI/LLM developer community, it is also widely used as an affectionate nickname for Google's **Gemini**.
-   - The project name `Hachimi Scan` serves both as a cultural tribute and as a playful nod to the software's vibe-coding lineage powered by **Google Antigravity** (Google DeepMind's Advanced Agentic Coding AI built upon Gemini).
+   - The project name `Hachimi Scan` serves both as a cultural tribute and as a playful nod to the software being vibe-coded with Google Antigravity / Gemini.
    - **The developers do not own, nor do they claim, any exclusive trademark or proprietary rights over the word "Hachimi".**
 
 2. **Non-Affiliation & Trademarks**:
