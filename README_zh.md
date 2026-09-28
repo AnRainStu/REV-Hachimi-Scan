@@ -18,7 +18,7 @@
 
 *专注本地离线处理的 Android 文档扫描小工具。无广告、零追踪、无需联网权限。*
 
-[English](README.md) | [简体中文](README_zh.md) | [下载最新安装包 (Releases)](https://github.com/eviau512/Hachimi-Scanner/releases)
+[English](README.md) | [简体中文](README_zh.md) | [下载最新安装包 (Releases)](https://github.com/eviau512/Hachimi-Scan/releases)
 
 </div>
 
@@ -85,8 +85,8 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/eviau512/Hachimi-Scanner.git
-cd Hachimi-Scanner
+git clone https://github.com/eviau512/Hachimi-Scan.git
+cd Hachimi-Scan
 
 # 构建哈基米 Release APK (带自签名配置)
 ./gradlew assembleHachimiRelease

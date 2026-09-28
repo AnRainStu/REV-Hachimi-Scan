@@ -18,7 +18,7 @@
 
 *An offline-first Android document scanner crafted with pure vibe coding. Zero ads, zero tracking, zero network permissions.*
 
-[English](README.md) | [简体中文](README_zh.md) | [Download Releases](https://github.com/eviau512/Hachimi-Scanner/releases)
+[English](README.md) | [简体中文](README_zh.md) | [Download Releases](https://github.com/eviau512/Hachimi-Scan/releases)
 
 </div>
 
@@ -85,8 +85,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/eviau512/Hachimi-Scanner.git
-cd Hachimi-Scanner
+git clone https://github.com/eviau512/Hachimi-Scan.git
+cd Hachimi-Scan
 
 # Build Hachimi Release APK (with auto-configured signing)
 ./gradlew assembleHachimiRelease
