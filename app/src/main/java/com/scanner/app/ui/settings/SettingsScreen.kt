@@ -31,6 +31,14 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
+    val appVersion = remember {
+        try {
+            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            packageInfo.versionName ?: "0.1.0"
+        } catch (e: Exception) {
+            "0.1.0"
+        }
+    }
 
     val languages = listOf(
         "en" to "English",
@@ -140,7 +148,7 @@ fun SettingsScreen(
                     ListItem(
                         headlineContent = {
                             Text(
-                                text = stringResource(R.string.version, "1.0.0"),
+                                text = stringResource(R.string.version, appVersion),
                                 fontWeight = FontWeight.Medium
                             )
                         },
