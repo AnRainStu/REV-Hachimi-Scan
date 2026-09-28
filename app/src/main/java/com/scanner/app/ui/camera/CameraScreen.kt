@@ -221,6 +221,8 @@ fun CameraScreen(
                             imageAnalysis
                         )
                         cameraControl = camera.cameraControl
+                        viewModel.cameraControl = camera.cameraControl
+                        viewModel.cameraInfo = camera.cameraInfo
                         camera.cameraControl.enableTorch(isTorchOn)
                     } catch (e: Exception) {
                         e.printStackTrace()

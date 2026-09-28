@@ -7,6 +7,8 @@ import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.graphics.PointF
 import android.media.ExifInterface
+import androidx.camera.core.CameraControl
+import androidx.camera.core.CameraInfo
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -62,6 +64,8 @@ class CameraViewModel : ViewModel() {
 
     var imageCapture: ImageCapture? = null
     var imageAnalysis: ImageAnalysis? = null
+    var cameraControl: CameraControl? = null
+    var cameraInfo: CameraInfo? = null
     var frameAnalyzer: com.scanner.app.data.camera.FrameAnalyzer? = null
 
     fun toggleCurvedMode() {
@@ -196,25 +200,60 @@ class CameraViewModel : ViewModel() {
     private fun captureBurstPhoto(context: Context, capture: ImageCapture, onPageSaved: (String) -> Unit) {
         viewModelScope.launch {
             _isCapturing.value = true
+            val control = cameraControl
+            val info = cameraInfo
             try {
-                // If not currently stable, wait briefly up to 2 seconds for camera to stabilize
+                // If not currently stable, wait briefly up to 2 seconds for camera to stabilize (SPEC_08)
                 if (!_isStable.value) {
                     withTimeoutOrNull(2000L) {
                         _isStable.first { it }
                     }
                 }
 
-                // Rapidly collect 3 burst frames
-                val burstCount = 3
+                // Query hardware exposure capabilities for Dynamic EV Bracketing (SPEC_08 Section 2)
+                val exposureState = info?.exposureState
+                val minIndex = exposureState?.exposureCompensationRange?.lower ?: 0
+                val step = exposureState?.exposureCompensationStep?.let {
+                    if (it.denominator != 0) it.numerator.toFloat() / it.denominator.toFloat() else 1.0f
+                } ?: 1.0f
+
+                // Target -2.0 EV compensation index to pull bright screen highlights into linear range (SPEC_08)
+                val targetHighlightIndex = if (step > 0f) {
+                    val calculated = kotlin.math.round(-2.0f / step).toInt()
+                    calculated.coerceIn(minIndex, 0)
+                } else {
+                    minIndex.coerceAtMost(0)
+                }
+
                 val tempFiles = mutableListOf<File>()
-                for (i in 0 until burstCount) {
-                    val tempFile = File(context.cacheDir, "burst_${UUID.randomUUID()}_$i.jpg")
-                    val success = takeSinglePicture(capture, context, tempFile)
-                    if (success && tempFile.exists() && tempFile.length() > 0) {
-                        normalizeExifOrientation(tempFile)
-                        tempFiles.add(tempFile)
-                    }
-                    delay(40)
+
+                // Frame 0: EV = 0 (Base frame: geometry baseline and ambient environment)
+                val file0 = File(context.cacheDir, "burst_${UUID.randomUUID()}_0.jpg")
+                if (takeSinglePicture(capture, context, file0) && file0.exists() && file0.length() > 0) {
+                    normalizeExifOrientation(file0)
+                    tempFiles.add(file0)
+                }
+
+                // Frame 1: EV = targetHighlightIndex (Highlight frame: LCD/OLED screen text unclipped)
+                if (targetHighlightIndex < 0 && control != null) {
+                    setExposureIndex(control, context, targetHighlightIndex)
+                    delay(70)
+                }
+                val file1 = File(context.cacheDir, "burst_${UUID.randomUUID()}_1.jpg")
+                if (takeSinglePicture(capture, context, file1) && file1.exists() && file1.length() > 0) {
+                    normalizeExifOrientation(file1)
+                    tempFiles.add(file1)
+                }
+
+                // Frame 2: EV = 0 (Denoise & temporal redundancy frame)
+                if (targetHighlightIndex < 0 && control != null) {
+                    setExposureIndex(control, context, 0)
+                    delay(70)
+                }
+                val file2 = File(context.cacheDir, "burst_${UUID.randomUUID()}_2.jpg")
+                if (takeSinglePicture(capture, context, file2) && file2.exists() && file2.length() > 0) {
+                    normalizeExifOrientation(file2)
+                    tempFiles.add(file2)
                 }
 
                 if (tempFiles.isEmpty()) {
@@ -238,7 +277,7 @@ class CameraViewModel : ViewModel() {
 
                         if (mats.size >= 2) {
                             val fusionEngine = NativeBurstFusion()
-                            val fusedMat = fusionEngine.fuseBurstFrames(mats, removeGlare = true)
+                            val fusedMat = fusionEngine.fuseBurstFrames(mats, removeGlare = true, isScreenMode = true)
                             if (!fusedMat.empty()) {
                                 Imgcodecs.imwrite(finalPhotoFile.absolutePath, fusedMat)
                                 fusedMat.release()
@@ -282,7 +321,31 @@ class CameraViewModel : ViewModel() {
             } catch (e: Exception) {
                 e.printStackTrace()
                 _isCapturing.value = false
+            } finally {
+                // Ensure exposure compensation is always restored to baseline EV = 0
+                control?.setExposureCompensationIndex(0)
             }
+        }
+    }
+
+    private suspend fun setExposureIndex(
+        control: CameraControl,
+        context: Context,
+        index: Int
+    ): Int = suspendCancellableCoroutine { continuation ->
+        try {
+            val future = control.setExposureCompensationIndex(index)
+            val executor = ContextCompat.getMainExecutor(context)
+            future.addListener({
+                try {
+                    val result = future.get()
+                    if (continuation.isActive) continuation.resume(result)
+                } catch (e: Exception) {
+                    if (continuation.isActive) continuation.resume(index)
+                }
+            }, executor)
+        } catch (e: Exception) {
+            if (continuation.isActive) continuation.resume(index)
         }
     }
 

@@ -109,7 +109,7 @@ Java_com_scanner_app_engine_NativePerspective_nativeApplyFilter(JNIEnv* /* env *
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_scanner_app_engine_NativeBurstFusion_nativeFuseBurstFrames(JNIEnv* env, jobject /* this */, jlongArray matAddrs, jboolean removeGlare) {
+Java_com_scanner_app_engine_NativeBurstFusion_nativeFuseBurstFrames(JNIEnv* env, jobject /* this */, jlongArray matAddrs, jboolean removeGlare, jboolean isScreenMode) {
     if (!matAddrs) return 0;
 
     jsize len = env->GetArrayLength(matAddrs);
@@ -130,7 +130,7 @@ Java_com_scanner_app_engine_NativeBurstFusion_nativeFuseBurstFrames(JNIEnv* env,
     if (frames.empty()) return 0;
 
     BurstFusionEngine engine;
-    cv::Mat fused = engine.fuseBurstFrames(frames, removeGlare);
+    cv::Mat fused = engine.fuseBurstFrames(frames, removeGlare, isScreenMode);
 
     cv::Mat* result = new cv::Mat(fused);
     return reinterpret_cast<jlong>(result);
