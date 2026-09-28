@@ -51,6 +51,16 @@
 [相机恢复 EV = 0，送入底层 C++ 融合管线]
 ```
 
+### 2.1 CameraX EV 硬件曝光控制工程落地细节 (CameraX Implementation)
+* **曝光步长与下潜深度解算**：
+  从 CameraX `CameraInfo.exposureState` 中读取硬件实际曝光调节能力：
+  $$\text{TargetIndex} = \text{round}\left( \frac{-2.0}{\text{step}} \right), \quad \text{TargetIndex} \in [\text{range.lower}, 0]$$
+  若硬件步长为 $\frac{1}{3}\text{ EV}$，则目标索引设为 $-6$；若硬件支持下限不足 $-2.0\text{ EV}$，则平滑钳位至硬件最低负补偿值；
+* **曝光切换稳定性时序保护**：
+  由于移动端感光元件采用滚动快门（Rolling Shutter）且 ISP 自动曝光需经过 $1 \sim 2$ 帧的测光反馈周期，在调用 `CameraControl.setExposureCompensationIndex(targetIndex)` 之后，协程流水线引入 $\Delta t \ge 70\text{ ms}$ 的短暂硬件响应延时，确保拍摄帧切实处于深负曝光状态；
+* **状态机无条件重置保护**：
+  连拍控制流外层严格包裹 `try ... finally` 异常保护块，在连拍完成或发生异常时无条件调用 `cameraControl.setExposureCompensationIndex(0)`，确保预览取景框与后续普通拍照模式永远恢复基准环境曝光，绝不残留偏暗画面。
+
 ---
 
 ## 3. 亚像素软件防抖与空间配准规范 (Subpixel Stabilization)
@@ -100,29 +110,61 @@ $$\Delta_{\text{diff}}(k) = \frac{1}{3} \sum_{c \in \{B, G, R\}} \left| I_k'^c(x
 
 ## 5. 模块接口契约规范 (Interface Contract)
 
-### 5.1 C++ 底层核心接口
+### 5.1 C++ 核心算子接口 (`burst_fusion.h`)
 ```cpp
-namespace scanner {
-
 class BurstFusionEngine {
 public:
     /**
-     * 多帧曝光包围 HDR 软件防抖融合算子
-     * @param burstFrames: 2~3 帧连拍输入 (CV_8UC3, BGR 格式)
-     * @param evOffsets: 各帧对应的曝光补偿值 (如 [0.0f, -2.0f, 0.0f])
-     * @param isScreenMode: 是否开启屏幕特化防过曝增强
-     * @return: 合成后的高动态范围、无反光、无重影图像 (CV_8UC3)
+     * 多帧曝光包围 HDR、单应性几何对齐与屏幕防过曝融合算子
+     * @param burstFrames: 2~5 帧短曝光/包围曝光连拍输入图像 (BGR格式)
+     * @param removeGlare: 是否开启智能高光反光擦除
+     * @param isScreenMode: 是否开启屏幕特化防过曝与曝光融合增强
+     * @return: 融合后的超清晰、无噪点、无反光基准图像
      */
-    cv::Mat fuseScreenHDR(
+    cv::Mat fuseBurstFrames(
         const std::vector<cv::Mat>& burstFrames,
-        const std::vector<float>& evOffsets = {},
+        bool removeGlare = true,
         bool isScreenMode = true
     );
-};
 
-} // namespace scanner
+private:
+    bool alignFrame(const cv::Mat& src, const cv::Mat& ref, cv::Mat& outAligned);
+};
 ```
 
-### 5.2 降级保护机制 (Graceful Degradation)
+### 5.2 JNI 与 Android 运行时绑定契约
+* **JNI 导出符号 (`jni_bridge.cpp`)**：
+  ```cpp
+  JNIEXPORT jlong JNICALL
+  Java_com_scanner_app_engine_NativeBurstFusion_nativeFuseBurstFrames(
+      JNIEnv* env, jobject thiz,
+      jlongArray matAddrs,
+      jboolean removeGlare,
+      jboolean isScreenMode
+  );
+  ```
+* **Kotlin 引擎封装 (`NativeBurstFusion.kt`)**：
+  ```kotlin
+  fun fuseBurstFrames(
+      burstFrames: List<Mat>,
+      removeGlare: Boolean = true,
+      isScreenMode: Boolean = true
+  ): Mat
+  ```
+
+### 5.3 降级保护机制 (Graceful Degradation)
 * 若输入单帧或特征点匹配对 $< 12$ 对：直接返回原始基准帧；
-* 若底层曝光融合异常：回退至时域加权中值与高光置换流水线，确保 APP 0 崩溃。
+* 若底层 Mertens 曝光融合异常：自动回退至时域加权中值与高光置换流水线，确保 APP 0 崩溃。
+
+---
+
+## 6. 学术算法溯源与法务洁净室合规声明 (Provenance & Clean-Room Statement)
+
+* **曝光融合算法溯源**：
+  核心多曝光金字塔融合模型严格遵循计算机图形学领域著名学术成果：
+  > Tom Mertens, Jan Kautz, Frank Van Reeth. *"Exposure Fusion: A Simple and Practical Alternative to High Dynamic Range Photography"*, Computer Graphics Forum (Pacific Graphics 2007).
+  底层调用 OpenCV 官方开源实现模块 `cv::createMergeMertens`（遵循 3-Clause BSD / Apache 2.0 开源许可）。
+* **硬件控制标准性**：
+  EV 曝光包围流水线完全采用 Google 官方 AndroidX CameraX 标准公开接口（`CameraControl` / `CameraInfo`），未引入任何未公开的私有反射调用。
+* **洁净室独立实现**：
+  全链路代码具备完全自主研发与独立版权属性，无任何竞品专有逆向代码或商业机密污染，符合严苛的开源法律与合规审计要求。
