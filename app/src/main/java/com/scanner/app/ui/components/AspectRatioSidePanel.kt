@@ -212,3 +212,147 @@ private fun RatioSideButton(
         )
     }
 }
+
+@Composable
+fun AspectRatioBanner(
+    selectedRatio: AspectRatioPreset,
+    onSelectRatio: (AspectRatioPreset) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val quickItems = listOf(
+        AspectRatioPreset.A4,
+        AspectRatioPreset.RATIO_4_3,
+        AspectRatioPreset.CUSTOM
+    )
+    val isDropdownSelected = selectedRatio !in quickItems
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+    ) {
+        quickItems.forEach { preset ->
+            val isSelected = selectedRatio == preset
+            val bg = if (isSelected) PrismCyan.copy(alpha = 0.25f) else Color(0x22FFFFFF)
+            val border = if (isSelected) PrismCyan else Color(0x22FFFFFF)
+            val contentColor = if (isSelected) PrismCyan else Color(0xFFE2E8F0)
+
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(bg)
+                    .border(1.dp, border, RoundedCornerShape(14.dp))
+                    .clickable { onSelectRatio(preset) }
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = when (preset) {
+                        AspectRatioPreset.A4 -> "A4"
+                        AspectRatioPreset.RATIO_4_3 -> "4:3"
+                        AspectRatioPreset.CUSTOM -> stringResource(R.string.ratio_custom)
+                        else -> stringResource(preset.titleRes)
+                    },
+                    fontSize = 12.sp,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = contentColor
+                )
+            }
+        }
+
+        // Dropdown button opening full ratio list (A3, 16:9, 8:7, etc.)
+        Box {
+            val dropBtnBg = if (isDropdownSelected) PrismCyan.copy(alpha = 0.25f) else Color(0x22FFFFFF)
+            val dropBtnBorder = if (isDropdownSelected) PrismCyan else Color(0x22FFFFFF)
+            val dropBtnTint = if (isDropdownSelected) PrismCyan else Color(0xFFE2E8F0)
+
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(dropBtnBg)
+                    .border(1.dp, dropBtnBorder, RoundedCornerShape(14.dp))
+                    .clickable { expanded = true }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = if (isDropdownSelected) {
+                        when (selectedRatio) {
+                            AspectRatioPreset.A3 -> "A3"
+                            AspectRatioPreset.RATIO_16_9 -> "16:9"
+                            AspectRatioPreset.RATIO_8_7 -> "8:7"
+                            else -> stringResource(selectedRatio.titleRes)
+                        }
+                    } else stringResource(R.string.aspect_ratio),
+                    fontSize = 12.sp,
+                    fontWeight = if (isDropdownSelected) FontWeight.Bold else FontWeight.Medium,
+                    color = dropBtnTint
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "All ratios",
+                    tint = dropBtnTint,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                modifier = Modifier
+                    .background(Color(0xF00F172A))
+                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(12.dp))
+            ) {
+                val allPresets = listOf(
+                    AspectRatioPreset.A4,
+                    AspectRatioPreset.A3,
+                    AspectRatioPreset.RATIO_4_3,
+                    AspectRatioPreset.RATIO_16_9,
+                    AspectRatioPreset.RATIO_8_7,
+                    AspectRatioPreset.CUSTOM
+                )
+
+                allPresets.forEach { preset ->
+                    val isItemActive = selectedRatio == preset
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                text = when (preset) {
+                                    AspectRatioPreset.A4 -> "A4 (竖版)"
+                                    AspectRatioPreset.A3 -> "A3 (横版 A4)"
+                                    AspectRatioPreset.RATIO_4_3 -> "4:3 (标准)"
+                                    AspectRatioPreset.RATIO_16_9 -> "16:9 (宽屏)"
+                                    AspectRatioPreset.RATIO_8_7 -> "8:7 (投影/全传感器)"
+                                    AspectRatioPreset.CUSTOM -> stringResource(R.string.ratio_custom)
+                                },
+                                color = if (isItemActive) PrismCyan else Color.White,
+                                fontWeight = if (isItemActive) FontWeight.Bold else FontWeight.Normal,
+                                fontSize = 13.sp
+                            )
+                        },
+                        trailingIcon = {
+                            if (isItemActive) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = PrismCyan,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        },
+                        onClick = {
+                            onSelectRatio(preset)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}

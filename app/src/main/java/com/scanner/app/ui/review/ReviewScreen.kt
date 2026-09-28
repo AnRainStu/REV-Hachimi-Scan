@@ -56,7 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.R
 import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.ImageFilter
-import com.scanner.app.ui.components.AspectRatioSidePanel
+import com.scanner.app.ui.components.AspectRatioBanner
 import com.scanner.app.ui.export.ExportDialog
 import com.scanner.app.ui.theme.PrismCyan
 import java.io.File
@@ -479,21 +479,6 @@ fun ReviewScreen(
                 }
             }
 
-            // Right-side Floating Aspect Ratio Panel in full preview mode
-            val currentPreset = remember(page.targetAspectRatio) {
-                AspectRatioPreset.fromRatio(page.targetAspectRatio)
-            }
-
-            AspectRatioSidePanel(
-                selectedRatio = currentPreset,
-                onSelectRatio = { preset ->
-                    viewModel.setPageAspectRatio(page.id, preset)
-                },
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 12.dp)
-            )
-
             // Top Bar docked at top edge
             Surface(
                 modifier = Modifier
@@ -577,7 +562,7 @@ fun ReviewScreen(
                 )
             }
 
-            // Floating Filter Capsule safely above navigation bars
+            // Floating Aspect Ratio & Filter Capsule safely above navigation bars
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -588,37 +573,61 @@ fun ReviewScreen(
                 border = BorderStroke(1.dp, Color(0x33FFFFFF)),
                 shadowElevation = 8.dp
             ) {
-                Row(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    FilterOptionChip(
-                        label = stringResource(R.string.filter_original),
-                        icon = Icons.Default.Image,
-                        isSelected = page.filter == ImageFilter.ORIGINAL,
-                        onClick = { viewModel.setPageFilter(page.id, ImageFilter.ORIGINAL) }
+                    val currentPreset = remember(page.targetAspectRatio) {
+                        AspectRatioPreset.fromRatio(page.targetAspectRatio)
+                    }
+
+                    // Top Banner: Aspect Ratio Selection
+                    AspectRatioBanner(
+                        selectedRatio = currentPreset,
+                        onSelectRatio = { preset ->
+                            viewModel.setPageAspectRatio(page.id, preset)
+                        },
+                        modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
                     )
-                    FilterOptionChip(
-                        label = stringResource(R.string.filter_magic),
-                        icon = Icons.Default.AutoAwesome,
-                        isSelected = page.filter == ImageFilter.MAGIC_COLOR,
-                        onClick = { viewModel.setPageFilter(page.id, ImageFilter.MAGIC_COLOR) }
+
+                    HorizontalDivider(
+                        color = Color(0x1FFFFFFF),
+                        thickness = 0.5.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
-                    FilterOptionChip(
-                        label = stringResource(R.string.filter_bw),
-                        icon = Icons.Default.Contrast,
-                        isSelected = page.filter == ImageFilter.BW,
-                        onClick = { viewModel.setPageFilter(page.id, ImageFilter.BW) }
-                    )
-                    FilterOptionChip(
-                        label = stringResource(R.string.filter_grayscale),
-                        icon = Icons.Default.FilterBAndW,
-                        isSelected = page.filter == ImageFilter.GRAYSCALE,
-                        onClick = { viewModel.setPageFilter(page.id, ImageFilter.GRAYSCALE) }
-                    )
+
+                    // Bottom Row: Image Filters
+                    Row(
+                        modifier = Modifier
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        FilterOptionChip(
+                            label = stringResource(R.string.filter_original),
+                            icon = Icons.Default.Image,
+                            isSelected = page.filter == ImageFilter.ORIGINAL,
+                            onClick = { viewModel.setPageFilter(page.id, ImageFilter.ORIGINAL) }
+                        )
+                        FilterOptionChip(
+                            label = stringResource(R.string.filter_magic),
+                            icon = Icons.Default.AutoAwesome,
+                            isSelected = page.filter == ImageFilter.MAGIC_COLOR,
+                            onClick = { viewModel.setPageFilter(page.id, ImageFilter.MAGIC_COLOR) }
+                        )
+                        FilterOptionChip(
+                            label = stringResource(R.string.filter_bw),
+                            icon = Icons.Default.Contrast,
+                            isSelected = page.filter == ImageFilter.BW,
+                            onClick = { viewModel.setPageFilter(page.id, ImageFilter.BW) }
+                        )
+                        FilterOptionChip(
+                            label = stringResource(R.string.filter_grayscale),
+                            icon = Icons.Default.FilterBAndW,
+                            isSelected = page.filter == ImageFilter.GRAYSCALE,
+                            onClick = { viewModel.setPageFilter(page.id, ImageFilter.GRAYSCALE) }
+                        )
+                    }
                 }
             }
 
