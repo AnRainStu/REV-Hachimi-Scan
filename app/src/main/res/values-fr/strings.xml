@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DocScanner</string>
+    <string name="camera_title">Numériser</string>
+    <string name="crop_title">Ajuster</string>
+    <string name="review_title">%d pages</string>
+    <string name="settings_title">Paramètres</string>
+    <string name="curved_mode">Courbe</string>
+    <string name="capture">Capturer</string>
+    <string name="filter_original">Original</string>
+    <string name="filter_grayscale">Niveaux de gris</string>
+    <string name="confirm">Confirmer</string>
+    <string name="cancel">Annuler</string>
+    <string name="add_more">Ajouter</string>
+    <string name="export">Exporter</string>
+    <string name="export_folder">Dossier</string>
+    <string name="export_pdf">PDF</string>
+    <string name="export_name">Nom d\'export</string>
+    <string name="exporting">Exportation en cours&#8230;</string>
+    <string name="export_success">Exportation réussie</string>
+    <string name="export_error">Échec de l\'exportation</string>
+    <string name="delete">Supprimer</string>
+    <string name="rotate">Faire pivoter</string>
+    <string name="language">Langue</string>
+    <string name="about">À propos</string>
+    <string name="version">Version %s</string>
+    <string name="camera_permission_required">L\'autorisation de l\'appareil photo est requise</string>
+    <string name="grant_permission">Accorder l\'autorisation</string>
+    <string name="review">Aperçu</string>
+    <string name="open">Ouvrir</string>
+    <string name="share">Partager</string>
+    <string name="settings">Paramètres</string>
+    <string name="page_number">Page %d</string>
+</resources>

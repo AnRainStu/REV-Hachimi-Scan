@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DocScanner</string>
+    <string name="camera_title">Сканирование</string>
+    <string name="crop_title">Настройка</string>
+    <string name="review_title">%d стр.</string>
+    <string name="settings_title">Настройки</string>
+    <string name="curved_mode">Кривая</string>
+    <string name="capture">Снимок</string>
+    <string name="filter_original">Оригинал</string>
+    <string name="filter_grayscale">Оттенки серого</string>
+    <string name="confirm">Подтвердить</string>
+    <string name="cancel">Отмена</string>
+    <string name="add_more">Добавить еще</string>
+    <string name="export">Экспорт</string>
+    <string name="export_folder">Папка</string>
+    <string name="export_pdf">PDF</string>
+    <string name="export_name">Имя экспорта</string>
+    <string name="exporting">Экспорт&#8230;</string>
+    <string name="export_success">Экспорт выполнен</string>
+    <string name="export_error">Ошибка экспорта</string>
+    <string name="delete">Удалить</string>
+    <string name="rotate">Повернуть</string>
+    <string name="language">Язык</string>
+    <string name="about">О приложении</string>
+    <string name="version">Версия %s</string>
+    <string name="camera_permission_required">Требуется разрешение на использование камеры</string>
+    <string name="grant_permission">Предоставить разрешение</string>
+    <string name="review">Просмотр</string>
+    <string name="open">Открыть</string>
+    <string name="share">Поделиться</string>
+    <string name="settings">Настройки</string>
+    <string name="page_number">Страница %d</string>
+</resources>
