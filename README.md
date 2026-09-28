@@ -1,10 +1,11 @@
+> [!NOTE]
+> The owner of this repo built this entirely via vibe coding, and isn't quite sure what this Agent actually does. ¯\\\_(ツ)\_/¯
+
 <div align="center">
 
 <img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" alt="Hachimi Scan Logo" />
 
 # Hachimi Scan (哈基米扫描) 🐾
-
-> *The owner of this repo uses vibe coding completely, and does not very sure what everything this Agent does. ¯\\\_(ツ)\_/¯*
 
 **A lightweight, privacy-first Android document scanner, built 100% via vibe coding.**
 
@@ -17,7 +18,7 @@
 
 *纯 Vibe Coding 出品、专注本地离线处理的 Android 文档扫描小工具。无广告、零追踪、无需联网。*
 
-[English](#features) | [中文说明](#核心特性) | [构建指南](#构建与运行) | [开发致谢](#-开发致谢--acknowledgments) | [免责声明](#免责声明与商标声明--disclaimer--trademark-notice)
+[下载 APK (Releases)](https://github.com/eviau512/Hachimi-Scanner/releases) | [English](#features) | [中文说明](#核心特性) | [构建指南](#构建与运行) | [开发致谢](#-开发致谢--acknowledgments) | [免责声明](#免责声明与商标声明--disclaimer--trademark-notice)
 
 </div>
 
