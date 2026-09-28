@@ -3,7 +3,7 @@
 
 <div align="center">
 
-<img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" alt="Hachimi Scan Logo" />
+<img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" style="border-radius: 28px;" alt="Hachimi Scan Logo" />
 
 # Hachimi Scan (哈基米扫描) 🐾
 
