@@ -22,22 +22,8 @@ import org.opencv.core.Size
 import org.opencv.imgcodecs.Imgcodecs
 import org.opencv.imgproc.Imgproc
 import com.scanner.app.R
+import com.scanner.app.domain.model.AspectRatioPreset
 import java.io.File
-
-enum class AspectRatioPreset(
-    val titleRes: Int,
-    val ratio: Float?
-) {
-    FREE(R.string.ratio_free, null),
-    A4(R.string.ratio_a4, 210f / 297f),
-    LETTER(R.string.ratio_letter, 8.5f / 11f),
-    LEGAL(R.string.ratio_legal, 8.5f / 14f),
-    ID_CARD(R.string.ratio_id_card, 85.6f / 53.98f),
-    BUSINESS_CARD(R.string.ratio_business_card, 90f / 54f),
-    SQUARE(R.string.ratio_square, 1.0f),
-    RATIO_4_3(R.string.ratio_4_3, 4f / 3f),
-    RATIO_16_9(R.string.ratio_16_9, 16f / 9f)
-}
 
 class CropViewModel : ViewModel() {
 
@@ -46,7 +32,7 @@ class CropViewModel : ViewModel() {
     private val _imagePath = MutableStateFlow<String?>(null)
     val imagePath: StateFlow<String?> = _imagePath.asStateFlow()
 
-    private val _selectedRatio = MutableStateFlow(AspectRatioPreset.FREE)
+    private val _selectedRatio = MutableStateFlow(AspectRatioPreset.A4)
     val selectedRatio: StateFlow<AspectRatioPreset> = _selectedRatio.asStateFlow()
 
     private val _currentQuad = MutableStateFlow(
@@ -168,8 +154,9 @@ class CropViewModel : ViewModel() {
 
     fun loadPage(pageId: String) {
         currentPageId = pageId
-        _selectedRatio.value = AspectRatioPreset.FREE
         val page = PageRepository.getPage(pageId) ?: return
+        val savedRatio = page.targetAspectRatio
+        _selectedRatio.value = AspectRatioPreset.entries.find { it.ratio == savedRatio } ?: AspectRatioPreset.A4
         _imagePath.value = page.originalImagePath
         _selectedFilter.value = page.filter
         page.quad?.let {
@@ -181,74 +168,13 @@ class CropViewModel : ViewModel() {
 
     fun setAspectRatio(preset: AspectRatioPreset) {
         _selectedRatio.value = preset
-        val targetRatio = preset.ratio ?: return
-
-        val path = _imagePath.value ?: return
-        val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(path, boundsOpts)
-        val imgW = boundsOpts.outWidth.toFloat()
-        val imgH = boundsOpts.outHeight.toFloat()
-        if (imgW <= 0f || imgH <= 0f) return
-
-        val current = _currentQuad.value
-        val cx = (current.topLeft.x + current.topRight.x + current.bottomRight.x + current.bottomLeft.x) / 4f
-        val cy = (current.topLeft.y + current.topRight.y + current.bottomRight.y + current.bottomLeft.y) / 4f
-
-        fun dist(p1: PointF, p2: PointF): Float =
-            kotlin.math.hypot(p1.x - p2.x, p1.y - p2.y)
-
-        val currentW = (dist(current.topLeft, current.topRight) + dist(current.bottomLeft, current.bottomRight)) / 2f
-        val currentH = (dist(current.topLeft, current.bottomLeft) + dist(current.topRight, current.bottomRight)) / 2f
-
-        val isLandscape = currentW > currentH
-
-        val effectiveRatio = if (isLandscape) {
-            if (targetRatio >= 1f) targetRatio else (1f / targetRatio)
-        } else {
-            if (targetRatio <= 1f) targetRatio else (1f / targetRatio)
-        }
-
-        var newW: Float
-        var newH: Float
-
-        if (currentW / currentH > effectiveRatio) {
-            newH = currentH
-            newW = newH * effectiveRatio
-        } else {
-            newW = currentW
-            newH = newW / effectiveRatio
-        }
-
-        if (newW > imgW) {
-            newW = imgW
-            newH = newW / effectiveRatio
-        }
-        if (newH > imgH) {
-            newH = imgH
-            newW = newH * effectiveRatio
-        }
-
-        val halfW = newW / 2f
-        val halfH = newH / 2f
-
-        val clampedCx = cx.coerceIn(halfW, imgW - halfW)
-        val clampedCy = cy.coerceIn(halfH, imgH - halfH)
-
-        _currentQuad.value = DocumentQuad(
-            topLeft = PointF(clampedCx - halfW, clampedCy - halfH),
-            topRight = PointF(clampedCx + halfW, clampedCy - halfH),
-            bottomRight = PointF(clampedCx + halfW, clampedCy + halfH),
-            bottomLeft = PointF(clampedCx - halfW, clampedCy + halfH)
-        )
     }
 
     fun updateQuad(quad: DocumentQuad) {
-        _selectedRatio.value = AspectRatioPreset.FREE
         _currentQuad.value = quad
     }
 
     fun updateCorner(cornerIndex: Int, newPosition: PointF) {
-        _selectedRatio.value = AspectRatioPreset.FREE
         val current = _currentQuad.value
         val newQuad = when (cornerIndex) {
             0 -> DocumentQuad(newPosition, current.topRight, current.bottomRight, current.bottomLeft)
@@ -261,7 +187,6 @@ class CropViewModel : ViewModel() {
     }
 
     fun updateEdge(edgeIndex: Int, deltaX: Float, deltaY: Float) {
-        _selectedRatio.value = AspectRatioPreset.FREE
         val current = _currentQuad.value
         val newQuad = when (edgeIndex) {
             0 -> DocumentQuad(
@@ -294,7 +219,6 @@ class CropViewModel : ViewModel() {
     }
 
     fun resetToFullImage() {
-        _selectedRatio.value = AspectRatioPreset.FREE
         val path = _imagePath.value ?: return
         val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, boundsOpts)
@@ -363,7 +287,7 @@ class CropViewModel : ViewModel() {
     }
 
     fun reDetect() {
-        _selectedRatio.value = AspectRatioPreset.FREE
+        _selectedRatio.value = AspectRatioPreset.CUSTOM
         val path = _imagePath.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
             val mat = Imgcodecs.imread(path)

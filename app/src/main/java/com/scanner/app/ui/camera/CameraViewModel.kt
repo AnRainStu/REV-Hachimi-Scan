@@ -1,6 +1,7 @@
 package com.scanner.app.ui.camera
 
 import android.content.Context
+import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -393,6 +394,43 @@ class CameraViewModel : ViewModel() {
                 bottomRight = PointF(photoW - insetX, photoH - insetY),
                 bottomLeft = PointF(insetX, photoH - insetY)
             )
+        }
+    }
+
+    fun importFromUri(context: Context, uri: Uri, onPageSaved: (String) -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val photoFile = File(context.cacheDir, "${java.util.UUID.randomUUID()}.jpg")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    photoFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                if (photoFile.exists() && photoFile.length() > 0) {
+                    val (photoW, photoH) = getImageDimensions(photoFile)
+                    val mat = Imgcodecs.imread(photoFile.absolutePath)
+                    val detector = com.scanner.app.engine.NativeEdgeDetector()
+                    val detected = if (!mat.empty()) detector.detectDocument(mat, false) else null
+                    mat.release()
+
+                    val targetQuad = if (detected?.found == true && detected.quad != null) {
+                        detected.quad
+                    } else {
+                        computeTargetQuad(null, photoW, photoH)
+                    }
+
+                    val page = ScannedPage(
+                        originalImagePath = photoFile.absolutePath,
+                        quad = targetQuad
+                    )
+                    PageRepository.addPage(page)
+                    withContext(Dispatchers.Main) {
+                        onPageSaved(page.id)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 }

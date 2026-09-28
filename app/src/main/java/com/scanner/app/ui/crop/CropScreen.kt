@@ -22,6 +22,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
@@ -44,7 +45,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.R
+import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.ImageFilter
+import com.scanner.app.ui.components.AspectRatioSidePanel
 import com.scanner.app.ui.theme.PrismCyan
 import com.scanner.app.ui.theme.SteadyEmerald
 import java.io.File
@@ -156,125 +159,98 @@ fun CropScreen(
                 color = Color(0xFF0F172A),
                 tonalElevation = 8.dp
             ) {
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .navigationBarsPadding()
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Permanently visible paper aspect ratio selector directly above the filter bar
-                    Surface(
-                        color = Color(0xFF131D31),
-                        tonalElevation = 2.dp,
-                        border = BorderStroke(0.5.dp, Color(0x22FFFFFF))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            AspectRatioPreset.entries.forEach { preset ->
-                                RatioChip(
-                                    label = stringResource(preset.titleRes),
-                                    isSelected = selectedRatio == preset,
-                                    onClick = { viewModel.setAspectRatio(preset) }
-                                )
-                            }
-                        }
-                    }
-
-                    // Filter selection row + Confirm Action Button
                     Row(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                            .weight(1f)
+                            .padding(end = 8.dp)
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 8.dp)
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_original),
-                                icon = Icons.Default.Image,
-                                isSelected = selectedFilter == ImageFilter.ORIGINAL,
-                                onClick = { viewModel.setFilter(ImageFilter.ORIGINAL) }
-                            )
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_magic),
-                                icon = Icons.Default.AutoAwesome,
-                                isSelected = selectedFilter == ImageFilter.MAGIC_COLOR,
-                                onClick = { viewModel.setFilter(ImageFilter.MAGIC_COLOR) }
-                            )
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_bw),
-                                icon = Icons.Default.Contrast,
-                                isSelected = selectedFilter == ImageFilter.BW,
-                                onClick = { viewModel.setFilter(ImageFilter.BW) }
-                            )
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_grayscale),
-                                icon = Icons.Default.FilterBAndW,
-                                isSelected = selectedFilter == ImageFilter.GRAYSCALE,
-                                onClick = { viewModel.setFilter(ImageFilter.GRAYSCALE) }
-                            )
-                        }
+                        CropFilterChip(
+                            label = stringResource(R.string.filter_original),
+                            icon = Icons.Default.Image,
+                            isSelected = selectedFilter == ImageFilter.ORIGINAL,
+                            onClick = { viewModel.setFilter(ImageFilter.ORIGINAL) }
+                        )
+                        CropFilterChip(
+                            label = stringResource(R.string.filter_magic),
+                            icon = Icons.Default.AutoAwesome,
+                            isSelected = selectedFilter == ImageFilter.MAGIC_COLOR,
+                            onClick = { viewModel.setFilter(ImageFilter.MAGIC_COLOR) }
+                        )
+                        CropFilterChip(
+                            label = stringResource(R.string.filter_bw),
+                            icon = Icons.Default.Contrast,
+                            isSelected = selectedFilter == ImageFilter.BW,
+                            onClick = { viewModel.setFilter(ImageFilter.BW) }
+                        )
+                        CropFilterChip(
+                            label = stringResource(R.string.filter_grayscale),
+                            icon = Icons.Default.FilterBAndW,
+                            isSelected = selectedFilter == ImageFilter.GRAYSCALE,
+                            onClick = { viewModel.setFilter(ImageFilter.GRAYSCALE) }
+                        )
+                    }
 
-                        // Confirm Action Button
-                        Button(
-                            enabled = !isSaving && !isRotating,
-                            onClick = {
-                                isSaving = true
-                                viewModel.confirmCrop {
-                                    isSaving = false
-                                    onConfirm()
-                                }
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = SteadyEmerald,
-                                contentColor = Color(0xFF0F172A)
-                            ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-                        ) {
-                            if (isSaving) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = Color(0xFF0F172A),
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.confirm),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.confirm),
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
+                    // Confirm Action Button
+                    Button(
+                        enabled = !isSaving && !isRotating,
+                        onClick = {
+                            isSaving = true
+                            viewModel.confirmCrop {
+                                isSaving = false
+                                onConfirm()
                             }
+                        },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SteadyEmerald,
+                            contentColor = Color(0xFF0F172A)
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(18.dp),
+                                color = Color(0xFF0F172A),
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Check,
+                                contentDescription = stringResource(R.string.confirm),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = stringResource(R.string.confirm),
+                                fontWeight = FontWeight.Bold,
+                                maxLines = 1
+                            )
                         }
                     }
                 }
             }
         }
     ) { paddingValues ->
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(Color(0xFF0A0F1D))
         ) {
+            val containerW = constraints.maxWidth.toFloat()
+            val containerH = constraints.maxHeight.toFloat()
+
             val (origW, origH) = remember(imagePath, imageVersion) {
                 imagePath?.let { getUprightDimensions(it) } ?: Pair(0f, 0f)
             }
@@ -291,10 +267,27 @@ fun CropScreen(
                 }
             }
 
+            // Continuous rotation scale compensation:
+            // When rotating 90 deg, fit the rotated aspect ratio without clipping or layout jumping
+            val targetScale = remember(bitmap, containerW, containerH) {
+                if (bitmap != null && bitmap.width > 0 && bitmap.height > 0 && containerW > 0 && containerH > 0) {
+                    val bw = bitmap.width.toFloat()
+                    val bh = bitmap.height.toFloat()
+                    val sOrig = kotlin.math.min(containerW / bw, containerH / bh)
+                    val sRot = kotlin.math.min(containerW / bh, containerH / bw)
+                    if (sOrig > 0f) sRot / sOrig else 1.0f
+                } else 1.0f
+            }
+
+            val rotProgress = (rotationAngle.value / 90f).coerceIn(0f, 1f)
+            val dynamicScale = 1.0f + (targetScale - 1.0f) * rotProgress
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
+                        scaleX = dynamicScale
+                        scaleY = dynamicScale
                         rotationZ = rotationAngle.value
                     }
             ) {
@@ -322,6 +315,15 @@ fun CropScreen(
                     modifier = Modifier.fillMaxSize()
                 )
             }
+
+            // Right-side Floating Aspect Ratio Panel: A4, 4:3, Custom, Dropdown
+            AspectRatioSidePanel(
+                selectedRatio = selectedRatio,
+                onSelectRatio = { viewModel.setAspectRatio(it) },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp)
+            )
 
             AnimatedVisibility(
                 visible = isSaving,

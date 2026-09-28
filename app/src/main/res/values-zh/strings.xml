@@ -53,13 +53,10 @@
     <string name="re_crop">调整边界</string>
     <string name="applying_filter">正在应用滤镜&#8230;</string>
     <string name="aspect_ratio">纸张比例</string>
-    <string name="ratio_free">自由</string>
-    <string name="ratio_a4">A4 纸</string>
-    <string name="ratio_letter">Letter</string>
-    <string name="ratio_legal">Legal</string>
-    <string name="ratio_id_card">身份证/卡片</string>
-    <string name="ratio_business_card">名片</string>
-    <string name="ratio_square">1:1 正方</string>
-    <string name="ratio_4_3">4:3 标准</string>
-    <string name="ratio_16_9">16:9 宽屏</string>
+    <string name="ratio_custom">自定义</string>
+    <string name="ratio_a4">A4</string>
+    <string name="ratio_a3">A3</string>
+    <string name="ratio_4_3">4:3</string>
+    <string name="ratio_16_9">16:9</string>
+    <string name="ratio_8_7">8:7</string>
 </resources>

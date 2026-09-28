@@ -7,6 +7,7 @@ import android.graphics.PointF
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scanner.app.data.repository.PageRepository
+import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.DocumentQuad
 import com.scanner.app.domain.model.ImageFilter
 import com.scanner.app.domain.model.ScannedPage
@@ -17,6 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.opencv.core.Core
+import org.opencv.core.Mat
 import org.opencv.imgcodecs.Imgcodecs
 import java.io.File
 import java.io.FileOutputStream
@@ -91,7 +94,20 @@ class ReviewViewModel : ViewModel() {
                     )
                     val corrector = NativePerspective()
                     val targetRatio = page.targetAspectRatio ?: 0f
-                    val warpedMat = corrector.processDocument(srcMat, quad, newFilter, targetRatio)
+                    var warpedMat = corrector.processDocument(srcMat, quad, newFilter, targetRatio)
+
+                    val rot = (page.rotation % 360 + 360) % 360
+                    if (rot != 0) {
+                        val rotatedMat = Mat()
+                        when (rot) {
+                            90 -> Core.rotate(warpedMat, rotatedMat, Core.ROTATE_90_CLOCKWISE)
+                            180 -> Core.rotate(warpedMat, rotatedMat, Core.ROTATE_180)
+                            270 -> Core.rotate(warpedMat, rotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
+                            else -> warpedMat.copyTo(rotatedMat)
+                        }
+                        warpedMat.release()
+                        warpedMat = rotatedMat
+                    }
 
                     val origFile = File(origPath)
                     val croppedFile = File(origFile.parentFile, "crop_${page.id}.jpg")
@@ -103,6 +119,66 @@ class ReviewViewModel : ViewModel() {
                     val updated = page.copy(
                         processedImagePath = croppedFile.absolutePath,
                         filter = newFilter
+                    )
+                    PageRepository.updatePage(updated)
+                    withContext(Dispatchers.Main) {
+                        _imageVersion.value++
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                withContext(Dispatchers.Main) {
+                    _isProcessing.value = false
+                }
+            }
+        }
+    }
+
+    fun setPageAspectRatio(pageId: String, preset: AspectRatioPreset) {
+        val page = PageRepository.getPage(pageId) ?: return
+        val newTargetRatio = preset.ratio
+        if (page.targetAspectRatio == newTargetRatio && page.processedImagePath != null) return
+
+        viewModelScope.launch(Dispatchers.Default) {
+            _isProcessing.value = true
+            try {
+                val origPath = page.originalImagePath
+                val srcMat = Imgcodecs.imread(origPath)
+                if (!srcMat.empty()) {
+                    val quad = page.quad ?: DocumentQuad(
+                        PointF(0f, 0f),
+                        PointF(srcMat.cols().toFloat(), 0f),
+                        PointF(srcMat.cols().toFloat(), srcMat.rows().toFloat()),
+                        PointF(0f, srcMat.rows().toFloat())
+                    )
+                    val corrector = NativePerspective()
+                    val targetRatio = newTargetRatio ?: 0f
+                    var warpedMat = corrector.processDocument(srcMat, quad, page.filter, targetRatio)
+
+                    val rot = (page.rotation % 360 + 360) % 360
+                    if (rot != 0) {
+                        val rotatedMat = Mat()
+                        when (rot) {
+                            90 -> Core.rotate(warpedMat, rotatedMat, Core.ROTATE_90_CLOCKWISE)
+                            180 -> Core.rotate(warpedMat, rotatedMat, Core.ROTATE_180)
+                            270 -> Core.rotate(warpedMat, rotatedMat, Core.ROTATE_90_COUNTERCLOCKWISE)
+                            else -> warpedMat.copyTo(rotatedMat)
+                        }
+                        warpedMat.release()
+                        warpedMat = rotatedMat
+                    }
+
+                    val origFile = File(origPath)
+                    val croppedFile = File(origFile.parentFile, "crop_${page.id}.jpg")
+                    Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat)
+
+                    srcMat.release()
+                    warpedMat.release()
+
+                    val updated = page.copy(
+                        processedImagePath = croppedFile.absolutePath,
+                        targetAspectRatio = newTargetRatio
                     )
                     PageRepository.updatePage(updated)
                     withContext(Dispatchers.Main) {

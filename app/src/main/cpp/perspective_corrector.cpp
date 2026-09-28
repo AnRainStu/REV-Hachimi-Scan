@@ -26,22 +26,14 @@ cv::Mat PerspectiveCorrector::correctPerspective(const cv::Mat& src, const std::
     int maxHeight = std::max(10, static_cast<int>(std::round(maxH)));
 
     if (targetAspectRatio > 0.01f) {
-        // Enforce physical paper aspect ratio (W / H)
+        // Enforce target aspect ratio (W / H) strictly without orientation flipping
         float effRatio = targetAspectRatio;
-        bool isLandscape = maxW > maxH;
-        if (isLandscape) {
-            if (effRatio < 1.0f) effRatio = 1.0f / effRatio;
-        } else {
-            if (effRatio > 1.0f) effRatio = 1.0f / effRatio;
-        }
-
-        double wFromH = maxH * effRatio;
-        if (wFromH > maxW) {
-            maxWidth = std::max(10, static_cast<int>(std::round(wFromH)));
-            maxHeight = std::max(10, static_cast<int>(std::round(maxH)));
-        } else {
+        if (maxW / effRatio >= maxH) {
             maxWidth = std::max(10, static_cast<int>(std::round(maxW)));
             maxHeight = std::max(10, static_cast<int>(std::round(maxWidth / effRatio)));
+        } else {
+            maxHeight = std::max(10, static_cast<int>(std::round(maxH)));
+            maxWidth = std::max(10, static_cast<int>(std::round(maxHeight * effRatio)));
         }
     } else {
         // Free mode: Projective foreshortening vertical recovery estimation

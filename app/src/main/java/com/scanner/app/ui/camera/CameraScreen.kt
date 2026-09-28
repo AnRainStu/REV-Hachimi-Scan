@@ -1,10 +1,13 @@
 package com.scanner.app.ui.camera
 
-import android.view.ViewGroup
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
+import androidx.camera.core.resolutionselector.AspectRatioStrategy
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.animateColorAsState
@@ -21,6 +24,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.CropFree
+import androidx.compose.material.icons.filled.FlashOff
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -37,6 +42,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import android.net.Uri
+import android.view.ViewGroup
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.R
 import com.scanner.app.domain.model.DetectionResult
@@ -62,6 +71,16 @@ fun CameraScreen(
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.importFromUri(context, uri) { pageId ->
+                onNavigateToCrop(pageId)
+            }
+        }
+    }
 
     // Animated stability pulse effect
     val infiniteTransition = rememberInfiniteTransition(label = "pulseTransition")
@@ -101,6 +120,15 @@ fun CameraScreen(
         label = "shutterScale"
     )
 
+    var isTorchOn by remember { mutableStateOf(false) }
+    var cameraControl by remember { mutableStateOf<androidx.camera.core.CameraControl?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            cameraControl?.enableTorch(false)
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -114,6 +142,7 @@ fun CameraScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
+                    scaleType = PreviewView.ScaleType.FIT_CENTER
                 }
 
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
@@ -122,11 +151,27 @@ fun CameraScreen(
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
 
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
+                    val sensorResolutionSelector = ResolutionSelector.Builder()
+                        .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                        .setAspectRatioStrategy(
+                            AspectRatioStrategy(
+                                AspectRatio.RATIO_4_3,
+                                AspectRatioStrategy.FALLBACK_RULE_AUTO
+                            )
+                        )
+                        .build()
 
-                    val imageCapture = ImageCapture.Builder().build()
+                    val preview = Preview.Builder()
+                        .setResolutionSelector(sensorResolutionSelector)
+                        .build().also {
+                            it.setSurfaceProvider(previewView.surfaceProvider)
+                        }
+
+                    // Maximize quality for full sensor resolution output
+                    val imageCapture = ImageCapture.Builder()
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setResolutionSelector(sensorResolutionSelector)
+                        .build()
                     viewModel.imageCapture = imageCapture
 
                     val edgeDetector = NativeEdgeDetector()
@@ -139,6 +184,22 @@ fun CameraScreen(
                     viewModel.frameAnalyzer = frameAnalyzer
 
                     val imageAnalysis = ImageAnalysis.Builder()
+                        .setResolutionSelector(
+                            ResolutionSelector.Builder()
+                                .setResolutionStrategy(
+                                    ResolutionStrategy(
+                                        android.util.Size(1280, 960),
+                                        ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER
+                                    )
+                                )
+                                .setAspectRatioStrategy(
+                                    AspectRatioStrategy(
+                                        AspectRatio.RATIO_4_3,
+                                        AspectRatioStrategy.FALLBACK_RULE_AUTO
+                                    )
+                                )
+                                .build()
+                        )
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
                         .build()
@@ -152,13 +213,15 @@ fun CameraScreen(
 
                     try {
                         cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
+                        val camera = cameraProvider.bindToLifecycle(
                             lifecycleOwner,
                             cameraSelector,
                             preview,
                             imageCapture,
                             imageAnalysis
                         )
+                        cameraControl = camera.cameraControl
+                        camera.cameraControl.enableTorch(isTorchOn)
                     } catch (e: Exception) {
                         e.printStackTrace()
                     }
@@ -178,7 +241,7 @@ fun CameraScreen(
             )
         }
 
-        // 3. Top Floating Status & Action Bar
+        // 3. Top Floating Status & Action Bar (MS Lens style)
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -188,6 +251,31 @@ fun CameraScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Torch / Constant Light Toggle Button
+            val torchBg = if (isTorchOn) Color(0x66FBBF24) else Color(0x990A0F1D)
+            val torchBorder = if (isTorchOn) Color(0xFFFBBF24) else Color(0x2AFFFFFF)
+            val torchTint = if (isTorchOn) Color(0xFFFBBF24) else Color.White.copy(alpha = 0.85f)
+
+            IconButton(
+                onClick = {
+                    val nextState = !isTorchOn
+                    isTorchOn = nextState
+                    cameraControl?.enableTorch(nextState)
+                },
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(torchBg)
+                    .border(1.2.dp, torchBorder, CircleShape)
+            ) {
+                Icon(
+                    imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    contentDescription = "Torch",
+                    tint = torchTint,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
             // Frosted pill badge indicating stability
             Box(
                 modifier = Modifier
@@ -354,12 +442,27 @@ fun CameraScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left balanced anchor
+                // Left: Photo Gallery Import Button (MS Lens layout)
                 Box(
                     modifier = Modifier.size(56.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Left subtle placeholder to maintain perfect center alignment
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0x990A0F1D))
+                            .border(1.5.dp, Color(0x44FFFFFF), RoundedCornerShape(16.dp))
+                            .clickable { galleryLauncher.launch("image/*") },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Collections,
+                            contentDescription = stringResource(R.string.filter_original),
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
 
                 // Center Dual-Ring Tactile Shutter Button

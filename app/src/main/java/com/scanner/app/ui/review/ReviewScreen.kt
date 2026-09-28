@@ -54,7 +54,9 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.BackHandler
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.R
+import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.ImageFilter
+import com.scanner.app.ui.components.AspectRatioSidePanel
 import com.scanner.app.ui.export.ExportDialog
 import com.scanner.app.ui.theme.PrismCyan
 import java.io.File
@@ -360,7 +362,7 @@ fun ReviewScreen(
                 .background(Color(0xFF0A0F1D))
         ) {
             // Main page image preview with dual zoom gestures (clearing top and bottom toolbars)
-            Box(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 80.dp, bottom = 96.dp)
@@ -433,12 +435,28 @@ fun ReviewScreen(
                     },
                 contentAlignment = Alignment.Center
             ) {
+                val containerW = constraints.maxWidth.toFloat()
+                val containerH = constraints.maxHeight.toFloat()
+
+                val targetRotScale = remember(detailBitmap, containerW, containerH) {
+                    if (detailBitmap != null && detailBitmap.width > 0 && detailBitmap.height > 0 && containerW > 0 && containerH > 0) {
+                        val bw = detailBitmap.width.toFloat()
+                        val bh = detailBitmap.height.toFloat()
+                        val sOrig = kotlin.math.min(containerW / bw, containerH / bh)
+                        val sRot = kotlin.math.min(containerW / bh, containerH / bw)
+                        if (sOrig > 0f) sRot / sOrig else 1.0f
+                    } else 1.0f
+                }
+
+                val rotProgress = (rotationAngle.value / 90f).coerceIn(0f, 1f)
+                val dynamicRotScale = 1.0f + (targetRotScale - 1.0f) * rotProgress
+
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            scaleX = scaleAnim.value
-                            scaleY = scaleAnim.value
+                            scaleX = scaleAnim.value * dynamicRotScale
+                            scaleY = scaleAnim.value * dynamicRotScale
                             translationX = offsetXAnim.value
                             translationY = offsetYAnim.value
                             rotationZ = rotationAngle.value
@@ -460,6 +478,21 @@ fun ReviewScreen(
                     }
                 }
             }
+
+            // Right-side Floating Aspect Ratio Panel in full preview mode
+            val currentPreset = remember(page.targetAspectRatio) {
+                AspectRatioPreset.fromRatio(page.targetAspectRatio)
+            }
+
+            AspectRatioSidePanel(
+                selectedRatio = currentPreset,
+                onSelectRatio = { preset ->
+                    viewModel.setPageAspectRatio(page.id, preset)
+                },
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 12.dp)
+            )
 
             // Top Bar docked at top edge
             Surface(
