@@ -79,4 +79,10 @@
     <string name="batch_ratio_hint">Tap pages to select, then pick an aspect ratio below</string>
     <string name="batch_apply_title">Apply ratio to %d pages</string>
     <string name="batch_processing">Batch processing %d pages&#8230;</string>
+    <string name="multi_select">Select</string>
+    <string name="ratio">Ratio</string>
+    <string name="filter">Filter</string>
+    <string name="export_as">Export As</string>
+    <string name="delete_selected_title">Delete Pages</string>
+    <string name="delete_selected_confirm">Delete %d selected pages?</string>
 </resources>

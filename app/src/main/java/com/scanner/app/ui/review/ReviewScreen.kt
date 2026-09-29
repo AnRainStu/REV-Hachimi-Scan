@@ -5,8 +5,10 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Crop
@@ -84,10 +87,13 @@ fun ReviewScreen(
 
     var isMultiSelectMode by remember { mutableStateOf(false) }
     val selectedPageIds = remember { mutableStateListOf<String>() }
+    var activeBatchPanel by remember { mutableStateOf<BatchPanelType?>(null) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     BackHandler(enabled = isMultiSelectMode) {
         isMultiSelectMode = false
         selectedPageIds.clear()
+        activeBatchPanel = null
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -130,6 +136,7 @@ fun ReviewScreen(
                         IconButton(onClick = {
                             isMultiSelectMode = false
                             selectedPageIds.clear()
+                            activeBatchPanel = null
                         }) {
                             Icon(
                                 imageVector = Icons.Default.Close,
@@ -167,16 +174,17 @@ fun ReviewScreen(
                             TextButton(onClick = {
                                 isMultiSelectMode = true
                                 selectedPageIds.clear()
+                                activeBatchPanel = null
                             }) {
                                 Icon(
-                                    imageVector = Icons.Default.AspectRatio,
+                                    imageVector = Icons.Default.Checklist,
                                     contentDescription = null,
                                     tint = PrismCyan,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = stringResource(R.string.batch_ratio),
+                                    text = stringResource(R.string.multi_select),
                                     color = PrismCyan,
                                     fontWeight = FontWeight.SemiBold,
                                     fontSize = 13.sp
@@ -193,8 +201,8 @@ fun ReviewScreen(
         bottomBar = {
             if (isMultiSelectMode) {
                 Surface(
-                    tonalElevation = 6.dp,
-                    shadowElevation = 10.dp,
+                    tonalElevation = 8.dp,
+                    shadowElevation = 12.dp,
                     color = Color(0xF20F172A),
                     border = BorderStroke(1.dp, Color(0x33FFFFFF)),
                     shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
@@ -203,35 +211,158 @@ fun ReviewScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        if (selectedPageIds.isEmpty()) {
+                        val hasSelection = selectedPageIds.isNotEmpty()
+
+                        // Sub-panel for Aspect Ratio
+                        AnimatedVisibility(
+                            visible = activeBatchPanel == BatchPanelType.RATIO && hasSelection,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.batch_apply_title, selectedPageIds.size),
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 4.dp)
+                                )
+                                AspectRatioBanner(
+                                    selectedRatio = AspectRatioPreset.CUSTOM,
+                                    customRatioValue = null,
+                                    onSelectRatio = { preset ->
+                                        viewModel.setBatchAspectRatio(selectedPageIds.toList(), preset)
+                                    },
+                                    onSelectCustomRatio = { customRatio ->
+                                        viewModel.setBatchCustomRatio(selectedPageIds.toList(), customRatio)
+                                    }
+                                )
+                            }
+                        }
+
+                        // Sub-panel for Image Filter
+                        AnimatedVisibility(
+                            visible = activeBatchPanel == BatchPanelType.FILTER && hasSelection,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.batch_apply_title, selectedPageIds.size),
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 6.dp)
+                                )
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 4.dp, vertical = 2.dp)
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    FilterOptionChip(
+                                        label = stringResource(R.string.filter_original),
+                                        icon = Icons.Default.Image,
+                                        isSelected = false,
+                                        onClick = { viewModel.setBatchFilter(selectedPageIds.toList(), ImageFilter.ORIGINAL) }
+                                    )
+                                    FilterOptionChip(
+                                        label = stringResource(R.string.filter_magic),
+                                        icon = Icons.Default.AutoAwesome,
+                                        isSelected = false,
+                                        onClick = { viewModel.setBatchFilter(selectedPageIds.toList(), ImageFilter.MAGIC_COLOR) }
+                                    )
+                                    FilterOptionChip(
+                                        label = stringResource(R.string.filter_bw),
+                                        icon = Icons.Default.Contrast,
+                                        isSelected = false,
+                                        onClick = { viewModel.setBatchFilter(selectedPageIds.toList(), ImageFilter.BW) }
+                                    )
+                                    FilterOptionChip(
+                                        label = stringResource(R.string.filter_grayscale),
+                                        icon = Icons.Default.FilterBAndW,
+                                        isSelected = false,
+                                        onClick = { viewModel.setBatchFilter(selectedPageIds.toList(), ImageFilter.GRAYSCALE) }
+                                    )
+                                }
+                            }
+                        }
+
+                        if (!hasSelection) {
                             Text(
                                 text = stringResource(R.string.batch_ratio_hint),
-                                color = Color.White.copy(alpha = 0.7f),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(vertical = 12.dp)
+                                color = Color.White.copy(alpha = 0.65f),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
+                                modifier = Modifier.padding(vertical = 4.dp)
                             )
-                        } else {
-                            Text(
-                                text = stringResource(R.string.batch_apply_title, selectedPageIds.size),
-                                color = Color.White,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                        }
+
+                        // Four action buttons dock: 比例, 滤镜, 导出为, 删除
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 1. 比例 (Ratio)
+                            BatchActionButton(
+                                label = stringResource(R.string.ratio),
+                                icon = Icons.Default.AspectRatio,
+                                isActive = activeBatchPanel == BatchPanelType.RATIO,
+                                enabled = hasSelection,
+                                onClick = {
+                                    activeBatchPanel = if (activeBatchPanel == BatchPanelType.RATIO) null else BatchPanelType.RATIO
+                                }
                             )
-                            AspectRatioBanner(
-                                selectedRatio = AspectRatioPreset.CUSTOM,
-                                customRatioValue = null,
-                                onSelectRatio = { preset ->
-                                    viewModel.setBatchAspectRatio(selectedPageIds.toList(), preset)
-                                },
-                                onSelectCustomRatio = { customRatio ->
-                                    viewModel.setBatchCustomRatio(selectedPageIds.toList(), customRatio)
-                                },
-                                modifier = Modifier.padding(bottom = 4.dp)
+
+                            // 2. 滤镜 (Filter)
+                            BatchActionButton(
+                                label = stringResource(R.string.filter),
+                                icon = Icons.Default.AutoAwesome,
+                                isActive = activeBatchPanel == BatchPanelType.FILTER,
+                                enabled = hasSelection,
+                                onClick = {
+                                    activeBatchPanel = if (activeBatchPanel == BatchPanelType.FILTER) null else BatchPanelType.FILTER
+                                }
+                            )
+
+                            // 3. 导出为 (Export As)
+                            BatchActionButton(
+                                label = stringResource(R.string.export_as),
+                                icon = Icons.Default.Share,
+                                isActive = false,
+                                enabled = hasSelection,
+                                onClick = {
+                                    showExportDialog = true
+                                }
+                            )
+
+                            // 4. 删除 (Delete)
+                            BatchActionButton(
+                                label = stringResource(R.string.delete),
+                                icon = Icons.Default.Delete,
+                                isActive = false,
+                                enabled = hasSelection,
+                                isDanger = true,
+                                onClick = {
+                                    showDeleteConfirmDialog = true
+                                }
                             )
                         }
                     }
@@ -856,9 +987,101 @@ fun ReviewScreen(
 }
 
     if (showExportDialog) {
+        val exportPages = if (isMultiSelectMode && selectedPageIds.isNotEmpty()) {
+            pages.filter { it.id in selectedPageIds }
+        } else {
+            pages
+        }
         ExportDialog(
-            pages = pages,
+            pages = exportPages,
             onDismiss = { showExportDialog = false }
+        )
+    }
+
+    if (showDeleteConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = {
+                Text(
+                    text = stringResource(R.string.delete_selected_title),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.delete_selected_confirm, selectedPageIds.size),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val idsToDelete = selectedPageIds.toList()
+                        viewModel.deleteBatchPages(idsToDelete)
+                        selectedPageIds.clear()
+                        activeBatchPanel = null
+                        showDeleteConfirmDialog = false
+                        if (pages.size <= idsToDelete.size) {
+                            isMultiSelectMode = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(R.string.delete))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+}
+
+private enum class BatchPanelType {
+    RATIO,
+    FILTER
+}
+
+@Composable
+private fun BatchActionButton(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isActive: Boolean = false,
+    enabled: Boolean = true,
+    isDanger: Boolean = false,
+    onClick: () -> Unit
+) {
+    val contentColor = when {
+        !enabled -> Color.White.copy(alpha = 0.35f)
+        isDanger -> MaterialTheme.colorScheme.error
+        isActive -> PrismCyan
+        else -> Color.White
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = contentColor,
+            modifier = Modifier.size(24.dp)
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+            color = contentColor
         )
     }
 }
