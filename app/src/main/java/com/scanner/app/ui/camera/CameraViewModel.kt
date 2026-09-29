@@ -237,7 +237,6 @@ class CameraViewModel : ViewModel() {
                 // Frame 1: EV = targetHighlightIndex (Highlight frame: LCD/OLED screen text unclipped)
                 if (targetHighlightIndex < 0 && control != null) {
                     setExposureIndex(control, context, targetHighlightIndex)
-                    delay(70)
                 }
                 val file1 = File(context.cacheDir, "burst_${UUID.randomUUID()}_1.jpg")
                 if (takeSinglePicture(capture, context, file1) && file1.exists() && file1.length() > 0) {
@@ -248,7 +247,6 @@ class CameraViewModel : ViewModel() {
                 // Frame 2: EV = 0 (Denoise & temporal redundancy frame)
                 if (targetHighlightIndex < 0 && control != null) {
                     setExposureIndex(control, context, 0)
-                    delay(70)
                 }
                 val file2 = File(context.cacheDir, "burst_${UUID.randomUUID()}_2.jpg")
                 if (takeSinglePicture(capture, context, file2) && file2.exists() && file2.length() > 0) {
