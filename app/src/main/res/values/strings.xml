@@ -65,4 +65,10 @@
     <string name="custom_ratio_title">Custom Aspect Ratio</string>
     <string name="custom_ratio_hint">Enter width and height ratio</string>
     <string name="placeholder_input">Value</string>
+    <string name="experimental_features">Experimental Features</string>
+    <string name="full_hdr_title">Full HDR (Low-Level Camera2)</string>
+    <string name="full_hdr_summary">Direct Camera2 burst pipeline &amp; local tone mapping (Testing)</string>
+    <string name="full_hdr_warning_title">Experimental Feature Warning</string>
+    <string name="full_hdr_warning_desc">This mode directly takes over low-level Camera2 capture and sensor parameters for cross-brand HDR testing. On certain devices or custom ROMs (such as LineageOS), it may cause camera HAL unresponsiveness, frame drops, or camera service crashes.\n\nIntended for testing only. Enable anyway?</string>
+    <string name="confirm_enable">Enable</string>
 </resources>

@@ -114,6 +114,24 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
             mergeMertens->process(alignedFrames, fusion32F);
             if (!fusion32F.empty() && fusion32F.rows == rows && fusion32F.cols == cols) {
                 fusion32F.convertTo(mertensFused, CV_8UC3, 255.0);
+
+                // 局部色调映射与微对比度自适应增强 (Local Tone Mapping & Micro-contrast Enhancement)
+                // 消除 Mertens 金字塔多分辨率融合容易带来的画面发灰和平淡感，在保持高光不溢出的同时恢复文字黑度与通透感
+                try {
+                    cv::Mat lab;
+                    cv::cvtColor(mertensFused, lab, cv::COLOR_BGR2Lab);
+                    std::vector<cv::Mat> labPlanes(3);
+                    cv::split(lab, labPlanes);
+
+                    cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(1.8, cv::Size(8, 8));
+                    clahe->apply(labPlanes[0], labPlanes[0]);
+
+                    cv::merge(labPlanes, lab);
+                    cv::cvtColor(lab, mertensFused, cv::COLOR_Lab2BGR);
+                } catch (...) {
+                    // 若色彩空间转换异常，平滑降级使用原融合帧
+                }
+
                 mertensSuccess = true;
             }
         } catch (...) {

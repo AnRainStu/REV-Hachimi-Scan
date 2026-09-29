@@ -10,8 +10,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.HdrOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -57,6 +59,10 @@ fun SettingsScreen(
     }
 
     var showLangDialog by remember { mutableStateOf(false) }
+    var isFullHdrEnabled by remember {
+        mutableStateOf(prefs.getBoolean("full_hdr_enabled", false))
+    }
+    var showFullHdrWarning by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -126,6 +132,58 @@ fun SettingsScreen(
                             )
                         },
                         modifier = Modifier.clickable { showLangDialog = true }
+                    )
+                }
+            }
+
+            // Experimental Features Section
+            item {
+                Text(
+                    text = stringResource(R.string.experimental_features),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
+
+                Card(
+                    shape = RoundedCornerShape(16.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.full_hdr_title),
+                                fontWeight = FontWeight.Medium
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = stringResource(R.string.full_hdr_summary),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                imageVector = Icons.Default.HdrOn,
+                                contentDescription = null,
+                                tint = if (isFullHdrEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = isFullHdrEnabled,
+                                onCheckedChange = { checked ->
+                                    if (checked) {
+                                        showFullHdrWarning = true
+                                    } else {
+                                        isFullHdrEnabled = false
+                                        prefs.edit().putBoolean("full_hdr_enabled", false).apply()
+                                    }
+                                }
+                            )
+                        }
                     )
                 }
             }
@@ -214,6 +272,57 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showLangDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+            shape = RoundedCornerShape(20.dp)
+        )
+    }
+
+    if (showFullHdrWarning) {
+        AlertDialog(
+            onDismissRequest = { showFullHdrWarning = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = {
+                Text(
+                    text = stringResource(R.string.full_hdr_warning_title),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.full_hdr_warning_desc),
+                    style = MaterialTheme.typography.bodyMedium,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isFullHdrEnabled = true
+                        prefs.edit().putBoolean("full_hdr_enabled", true).apply()
+                        showFullHdrWarning = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text(stringResource(R.string.confirm_enable), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showFullHdrWarning = false
+                    }
+                ) {
                     Text(stringResource(R.string.cancel))
                 }
             },
