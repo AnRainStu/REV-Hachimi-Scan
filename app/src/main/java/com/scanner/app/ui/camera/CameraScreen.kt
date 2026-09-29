@@ -12,12 +12,19 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import java.io.File
+import kotlin.math.max
+import kotlin.math.min
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -68,6 +75,26 @@ fun CameraScreen(
     val isStable by viewModel.isStable.collectAsState()
     val isCapturing by viewModel.isCapturing.collectAsState()
     val pageCount by viewModel.pageCount.collectAsState()
+    val capturedPages by viewModel.capturedPages.collectAsState()
+
+    val lastPage = capturedPages.lastOrNull()
+    val lastThumbnailBitmap = remember(lastPage?.id, lastPage?.thumbnailPath, lastPage?.imagePath) {
+        val path = lastPage?.thumbnailPath ?: lastPage?.imagePath
+        if (path != null) {
+            val file = File(path)
+            if (file.exists()) {
+                try {
+                    val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(path, boundsOpts)
+                    val sampleSize = max(1, min(boundsOpts.outWidth / 120, boundsOpts.outHeight / 120))
+                    val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                    BitmapFactory.decodeFile(path, opts)
+                } catch (e: Exception) {
+                    null
+                }
+            } else null
+        } else null
+    }
 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -526,12 +553,23 @@ fun CameraScreen(
                                 .clickable { onNavigateToReview() },
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Collections,
-                                contentDescription = stringResource(R.string.review),
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            if (lastThumbnailBitmap != null) {
+                                Image(
+                                    bitmap = lastThumbnailBitmap.asImageBitmap(),
+                                    contentDescription = stringResource(R.string.review),
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(RoundedCornerShape(16.dp))
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Collections,
+                                    contentDescription = stringResource(R.string.review),
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
 
                             // Page count badge pill
                             Box(
