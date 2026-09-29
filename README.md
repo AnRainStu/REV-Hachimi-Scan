@@ -7,7 +7,7 @@
 
 # Hachimi Scan 🐾
 
-**A vibe-coded, fully-local Android document scanner.**
+**A vibe-coded, fully local Android document scanner.**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Specs: CC0 1.0](https://img.shields.io/badge/Specs-CC0%201.0-lightgrey.svg)](specs/LICENSE)
@@ -16,7 +16,7 @@
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-purple.svg)](https://developer.android.com/jetpack/compose)
 [![Engineered with Antigravity](https://img.shields.io/badge/Engineered%20with-Antigravity-6C5CE7?logo=google&logoColor=white)](https://deepmind.google)
 
-*An offline-first Android document scanner crafted with pure vibe coding. Zero ads, zero tracking, zero network permissions.*
+*Zero ads, zero tracking, zero network permissions. 100% on-device processing.*
 
 [English](README.md) | [简体中文](README_zh.md) | [Download Releases](https://github.com/eviau512/Hachimi-Scan/releases)
 

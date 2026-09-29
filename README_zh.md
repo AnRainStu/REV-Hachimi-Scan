@@ -16,7 +16,7 @@
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-purple.svg)](https://developer.android.com/jetpack/compose)
 [![Engineered with Antigravity](https://img.shields.io/badge/Engineered%20with-Antigravity-6C5CE7?logo=google&logoColor=white)](https://deepmind.google)
 
-*专注本地离线处理的 Android 文档扫描小工具。无广告、零追踪、无需联网权限。*
+*无广告、零追踪、无需联网权限。100% 本地端侧处理。*
 
 [English](README.md) | [简体中文](README_zh.md) | [下载最新安装包 (Releases)](https://github.com/eviau512/Hachimi-Scan/releases)
 
