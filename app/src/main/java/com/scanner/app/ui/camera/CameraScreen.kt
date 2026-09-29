@@ -233,6 +233,18 @@ fun CameraScreen(
                         CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE,
                         CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY
                     )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
+                        CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
+                    )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
+                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
+                    )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.TONEMAP_MODE,
+                        CaptureRequest.TONEMAP_MODE_HIGH_QUALITY
+                    )
 
                     val imageCapture = imageCaptureBuilder.build()
                     viewModel.imageCapture = imageCapture

@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.graphics.PointF
-import android.media.ExifInterface
+import androidx.exifinterface.media.ExifInterface
 import androidx.camera.core.CameraControl
 import androidx.camera.core.CameraInfo
 import androidx.camera.core.ImageAnalysis
@@ -275,6 +275,7 @@ class CameraViewModel : ViewModel() {
                                 Imgcodecs.imwrite(finalPhotoFile.absolutePath, fusedMat, saveParams)
                                 saveParams.release()
                                 fusedMat.release()
+                                copyExifMetadata(tempFiles[0], finalPhotoFile)
                             } else {
                                 tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
                             }
@@ -407,6 +408,34 @@ class CameraViewModel : ViewModel() {
 
     private fun getImageDimensions(file: File): Pair<Float, Float> {
         return normalizeExifOrientation(file)
+    }
+
+    private fun copyExifMetadata(srcFile: File, dstFile: File) {
+        try {
+            val srcExif = ExifInterface(srcFile.absolutePath)
+            val dstExif = ExifInterface(dstFile.absolutePath)
+            val tags = arrayOf(
+                ExifInterface.TAG_EXPOSURE_TIME,
+                ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
+                ExifInterface.TAG_F_NUMBER,
+                ExifInterface.TAG_FOCAL_LENGTH,
+                ExifInterface.TAG_WHITE_BALANCE,
+                ExifInterface.TAG_DATETIME,
+                ExifInterface.TAG_DATETIME_ORIGINAL,
+                ExifInterface.TAG_DATETIME_DIGITIZED,
+                ExifInterface.TAG_MAKE,
+                ExifInterface.TAG_MODEL
+            )
+            for (tag in tags) {
+                val value = srcExif.getAttribute(tag)
+                if (value != null) {
+                    dstExif.setAttribute(tag, value)
+                }
+            }
+            dstExif.saveAttributes()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun computeTargetQuad(currentResult: DetectionResult?, photoW: Float, photoH: Float): DocumentQuad {

@@ -132,6 +132,7 @@ dependencies {
     implementation("androidx.camera:camera-camera2:$cameraxVersion")
     implementation("androidx.camera:camera-lifecycle:$cameraxVersion")
     implementation("androidx.camera:camera-view:$cameraxVersion")
+    implementation("androidx.exifinterface:exifinterface:1.3.2")
     
     implementation("org.opencv:opencv:4.10.0")
 }

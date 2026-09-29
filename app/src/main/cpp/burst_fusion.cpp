@@ -192,5 +192,60 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
         }
     }
 
+    // 阶段二：电影级 S-Curve 暗部黑电平压制 (SPEC_13 §2.2)
+    // 对深暗阴影与夜空区 (Y <= 28.0)，平滑压低暗电平，沉降夜空散粒噪点，保持色彩比例守恒
+    for (int y = 0; y < rows; ++y) {
+        cv::Vec3b* pDst = result.ptr<cv::Vec3b>(y);
+        for (int x = 0; x < cols; ++x) {
+            cv::Vec3b& px = pDst[x];
+            float Y = 0.114f * static_cast<float>(px[0]) + 0.587f * static_cast<float>(px[1]) + 0.299f * static_cast<float>(px[2]);
+            if (Y <= 28.0f) {
+                float u = Y / 28.0f;
+                float Y_tone = Y * std::pow(u, 0.65f);
+                float scale = Y_tone / std::max(Y, 0.001f);
+                px[0] = cv::saturate_cast<uchar>(static_cast<float>(px[0]) * scale);
+                px[1] = cv::saturate_cast<uchar>(static_cast<float>(px[1]) * scale);
+                px[2] = cv::saturate_cast<uchar>(static_cast<float>(px[2]) * scale);
+            }
+        }
+    }
+
+    // 阶段三：自适应保边微反差与质感合成 (SPEC_13 §2.3)
+    // 提升树叶、砖缝、文字的微小反差细节，带死区控制（Coring）杜绝平坦区噪点放大
+    cv::Mat Y_mat(rows, cols, CV_32FC1);
+    for (int y = 0; y < rows; ++y) {
+        const cv::Vec3b* pDst = result.ptr<cv::Vec3b>(y);
+        float* pY = Y_mat.ptr<float>(y);
+        for (int x = 0; x < cols; ++x) {
+            const cv::Vec3b& px = pDst[x];
+            pY[x] = 0.114f * static_cast<float>(px[0]) + 0.587f * static_cast<float>(px[1]) + 0.299f * static_cast<float>(px[2]);
+        }
+    }
+
+    cv::Mat Y_blur;
+    cv::GaussianBlur(Y_mat, Y_blur, cv::Size(3, 3), 1.2);
+
+    const float tau = 2.0f;
+    const float beta = 0.55f;
+
+    for (int y = 0; y < rows; ++y) {
+        const float* pY = Y_mat.ptr<float>(y);
+        const float* pYBlur = Y_blur.ptr<float>(y);
+        cv::Vec3b* pDst = result.ptr<cv::Vec3b>(y);
+
+        for (int x = 0; x < cols; ++x) {
+            float D = pY[x] - pYBlur[x];
+            float absD = std::abs(D);
+            if (absD > tau) {
+                float sign = (D > 0.0f) ? 1.0f : -1.0f;
+                float deltaY = sign * std::min((absD - tau) * beta, 16.0f);
+                cv::Vec3b& px = pDst[x];
+                px[0] = cv::saturate_cast<uchar>(static_cast<float>(px[0]) + deltaY);
+                px[1] = cv::saturate_cast<uchar>(static_cast<float>(px[1]) + deltaY);
+                px[2] = cv::saturate_cast<uchar>(static_cast<float>(px[2]) + deltaY);
+            }
+        }
+    }
+
     return result;
 }
