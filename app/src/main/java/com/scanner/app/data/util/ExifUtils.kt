@@ -26,17 +26,22 @@ object ExifUtils {
 
     fun stampSignature(dstExif: ExifInterface) {
         try {
-            dstExif.setAttribute(ExifInterface.TAG_SOFTWARE, "Hachimi Cam (${BuildConfig.GIT_HASH})")
+            dstExif.setAttribute(ExifInterface.TAG_SOFTWARE, "Hachimi Scan v0.1.1 (${BuildConfig.GIT_HASH})")
             dstExif.setAttribute(ExifInterface.TAG_IMAGE_UNIQUE_ID, BuildConfig.GIT_HASH)
             dstExif.setAttribute(
                 ExifInterface.TAG_USER_COMMENT,
-                "Hachimi Scan Engine (Build: ${BuildConfig.GIT_HASH}, ${BuildConfig.BUILD_TIME})"
+                "Hachimi Scan v0.1.1 (Build: ${BuildConfig.GIT_HASH}, ${BuildConfig.BUILD_TIME})"
             )
-            if (dstExif.getAttribute(ExifInterface.TAG_MAKE).isNullOrBlank()) {
-                dstExif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER)
-            }
-            if (dstExif.getAttribute(ExifInterface.TAG_MODEL).isNullOrBlank()) {
-                dstExif.setAttribute(ExifInterface.TAG_MODEL, Build.MODEL)
+            if (BuildConfig.DEBUG) {
+                if (dstExif.getAttribute(ExifInterface.TAG_MAKE).isNullOrBlank()) {
+                    dstExif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER)
+                }
+                if (dstExif.getAttribute(ExifInterface.TAG_MODEL).isNullOrBlank()) {
+                    dstExif.setAttribute(ExifInterface.TAG_MODEL, Build.MODEL)
+                }
+            } else {
+                dstExif.setAttribute(ExifInterface.TAG_MAKE, null)
+                dstExif.setAttribute(ExifInterface.TAG_MODEL, null)
             }
         } catch (e: Exception) {
             e.printStackTrace()
