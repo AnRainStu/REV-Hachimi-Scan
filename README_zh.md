@@ -7,7 +7,7 @@
 
 # Hachimi Scan (哈基米扫描) 🐾
 
-**纯 Vibe Coding 打造的轻量级、隐私至上 Android 移动端文档扫描仪。**
+**纯 Vibe Coding 打造的纯本地离线 Android 文档扫描仪。**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Specs: CC0 1.0](https://img.shields.io/badge/Specs-CC0%201.0-lightgrey.svg)](specs/LICENSE)

@@ -73,6 +73,7 @@ fun CropScreen(
     val verticalLines by viewModel.verticalLines.collectAsState()
     val selectedFilter by viewModel.selectedFilter.collectAsState()
     val selectedRatio by viewModel.selectedRatio.collectAsState()
+    val customRatioValue by viewModel.customRatioValue.collectAsState()
     val imagePath by viewModel.imagePath.collectAsState()
     val imageVersion by viewModel.imageVersion.collectAsState()
     var isSaving by remember { mutableStateOf(false) }
@@ -167,7 +168,9 @@ fun CropScreen(
                     // Aspect ratio banner row directly above the filter selector
                     AspectRatioBanner(
                         selectedRatio = selectedRatio,
+                        customRatioValue = customRatioValue,
                         onSelectRatio = { viewModel.setAspectRatio(it) },
+                        onSelectCustomRatio = { viewModel.setCustomRatio(it) },
                         modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                     )
 

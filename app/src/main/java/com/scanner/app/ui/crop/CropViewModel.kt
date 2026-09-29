@@ -35,6 +35,9 @@ class CropViewModel : ViewModel() {
     private val _selectedRatio = MutableStateFlow(AspectRatioPreset.A4)
     val selectedRatio: StateFlow<AspectRatioPreset> = _selectedRatio.asStateFlow()
 
+    private val _customRatioValue = MutableStateFlow<Float?>(null)
+    val customRatioValue: StateFlow<Float?> = _customRatioValue.asStateFlow()
+
     private val _currentQuad = MutableStateFlow(
         DocumentQuad(
             topLeft = PointF(100f, 100f),
@@ -156,7 +159,13 @@ class CropViewModel : ViewModel() {
         currentPageId = pageId
         val page = PageRepository.getPage(pageId) ?: return
         val savedRatio = page.targetAspectRatio
-        _selectedRatio.value = AspectRatioPreset.entries.find { it.ratio == savedRatio } ?: AspectRatioPreset.A4
+        val matchedPreset = AspectRatioPreset.fromRatio(savedRatio)
+        _selectedRatio.value = matchedPreset
+        if (matchedPreset == AspectRatioPreset.CUSTOM) {
+            _customRatioValue.value = savedRatio
+        } else {
+            _customRatioValue.value = null
+        }
         _imagePath.value = page.originalImagePath
         _selectedFilter.value = page.filter
         page.quad?.let {
@@ -168,6 +177,14 @@ class CropViewModel : ViewModel() {
 
     fun setAspectRatio(preset: AspectRatioPreset) {
         _selectedRatio.value = preset
+        if (preset != AspectRatioPreset.CUSTOM) {
+            _customRatioValue.value = null
+        }
+    }
+
+    fun setCustomRatio(ratio: Float) {
+        _customRatioValue.value = ratio
+        _selectedRatio.value = AspectRatioPreset.CUSTOM
     }
 
     fun updateQuad(quad: DocumentQuad) {
@@ -288,6 +305,7 @@ class CropViewModel : ViewModel() {
 
     fun reDetect() {
         _selectedRatio.value = AspectRatioPreset.CUSTOM
+        _customRatioValue.value = null
         val path = _imagePath.value ?: return
         viewModelScope.launch(Dispatchers.IO) {
             val mat = Imgcodecs.imread(path)
@@ -322,7 +340,12 @@ class CropViewModel : ViewModel() {
         val page = PageRepository.getPage(id) ?: run { onDone(); return }
         val rawQuad = _currentQuad.value
         val filter = _selectedFilter.value
-        val targetRatio = _selectedRatio.value.ratio ?: 0f
+        val effectiveRatio = if (_selectedRatio.value == AspectRatioPreset.CUSTOM) {
+            _customRatioValue.value
+        } else {
+            _selectedRatio.value.ratio
+        }
+        val targetRatio = effectiveRatio ?: 0f
 
         viewModelScope.launch(Dispatchers.Default) {
             try {
@@ -342,7 +365,7 @@ class CropViewModel : ViewModel() {
                         processedImagePath = croppedFile.absolutePath,
                         quad = rawQuad,
                         filter = filter,
-                        targetAspectRatio = _selectedRatio.value.ratio
+                        targetAspectRatio = effectiveRatio
                     )
                     PageRepository.updatePage(updatedPage)
                     withContext(Dispatchers.Main) {
@@ -354,7 +377,7 @@ class CropViewModel : ViewModel() {
                 e.printStackTrace()
             }
 
-            val updatedPage = page.copy(quad = rawQuad, filter = filter, targetAspectRatio = _selectedRatio.value.ratio)
+            val updatedPage = page.copy(quad = rawQuad, filter = filter, targetAspectRatio = effectiveRatio)
             PageRepository.updatePage(updatedPage)
             withContext(Dispatchers.Main) {
                 onDone()

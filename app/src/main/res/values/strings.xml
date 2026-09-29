@@ -59,4 +59,10 @@
     <string name="ratio_4_3">4:3</string>
     <string name="ratio_16_9">16:9</string>
     <string name="ratio_8_7">8:7</string>
+    <string name="ratio_8k">8K</string>
+    <string name="ratio_16k">16K</string>
+    <string name="ratio_square">Square (1:1)</string>
+    <string name="custom_ratio_title">Custom Aspect Ratio</string>
+    <string name="custom_ratio_hint">Enter width and height ratio</string>
+    <string name="placeholder_input">Value</string>
 </resources>

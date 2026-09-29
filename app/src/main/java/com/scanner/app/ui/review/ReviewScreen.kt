@@ -583,8 +583,12 @@ fun ReviewScreen(
                     // Top Banner: Aspect Ratio Selection
                     AspectRatioBanner(
                         selectedRatio = currentPreset,
+                        customRatioValue = if (currentPreset == AspectRatioPreset.CUSTOM) page.targetAspectRatio else null,
                         onSelectRatio = { preset ->
                             viewModel.setPageAspectRatio(page.id, preset)
+                        },
+                        onSelectCustomRatio = { customRatio ->
+                            viewModel.setPageCustomRatio(page.id, customRatio)
                         },
                         modifier = Modifier.padding(top = 6.dp, bottom = 2.dp)
                     )
