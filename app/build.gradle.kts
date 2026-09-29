@@ -50,6 +50,12 @@ android {
         }
     }
 
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+
     signingConfigs {
         create("release") {
             val keyFile = file("hachimi-release.jks")
@@ -128,7 +134,4 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraxVersion")
     
     implementation("org.opencv:opencv:4.10.0")
-    
-    implementation("org.tensorflow:tensorflow-lite:2.16.1")
-    implementation("org.tensorflow:tensorflow-lite-gpu:2.16.1")
 }
