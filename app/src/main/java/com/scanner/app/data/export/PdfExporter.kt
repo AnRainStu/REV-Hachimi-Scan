@@ -37,7 +37,7 @@ class PdfExporter(private val context: Context) {
             val resolver = context.contentResolver
             
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val relativePath = Environment.DIRECTORY_DOCUMENTS + File.separator + "DocScanner"
+                val relativePath = Environment.DIRECTORY_DOCUMENTS + File.separator + "HachiCam"
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
                     put(MediaStore.MediaColumns.MIME_TYPE, "application/pdf")
@@ -49,12 +49,12 @@ class PdfExporter(private val context: Context) {
                     resolver.openOutputStream(uri)?.use { outStream ->
                         document.writeTo(outStream)
                     }
-                    return File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "DocScanner/$fileName")
+                    return File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS), "HachiCam/$fileName")
                 }
             }
             
             val docsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS)
-            val exportDir = File(docsDir, "DocScanner")
+            val exportDir = File(docsDir, "HachiCam")
             if (!exportDir.exists()) {
                 exportDir.mkdirs()
             }

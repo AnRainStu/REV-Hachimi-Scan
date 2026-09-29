@@ -26,11 +26,11 @@ object ExifUtils {
 
     fun stampSignature(dstExif: ExifInterface) {
         try {
-            dstExif.setAttribute(ExifInterface.TAG_SOFTWARE, "Hachimi Scan v0.1.1 (${BuildConfig.GIT_HASH})")
+            dstExif.setAttribute(ExifInterface.TAG_SOFTWARE, "HachiCam v0.1.1 (${BuildConfig.GIT_HASH})")
             dstExif.setAttribute(ExifInterface.TAG_IMAGE_UNIQUE_ID, BuildConfig.GIT_HASH)
             dstExif.setAttribute(
                 ExifInterface.TAG_USER_COMMENT,
-                "Hachimi Scan v0.1.1 (Build: ${BuildConfig.GIT_HASH}, ${BuildConfig.BUILD_TIME})"
+                "HachiCam v0.1.1 (Build: ${BuildConfig.GIT_HASH}, ${BuildConfig.BUILD_TIME})"
             )
             if (BuildConfig.DEBUG) {
                 if (dstExif.getAttribute(ExifInterface.TAG_MAKE).isNullOrBlank()) {

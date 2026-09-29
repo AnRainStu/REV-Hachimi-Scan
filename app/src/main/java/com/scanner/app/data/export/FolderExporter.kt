@@ -26,7 +26,7 @@ class FolderExporter(private val context: Context) {
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val relativePath = Environment.DIRECTORY_PICTURES + File.separator + "DocScanner" + File.separator + baseName
+            val relativePath = Environment.DIRECTORY_DCIM + File.separator + "HachiCam"
             
             pages.forEachIndexed { index, page ->
                 val fileName = String.format(java.util.Locale.US, "%s-P%03d.jpg", baseName, index + 1)
@@ -53,10 +53,10 @@ class FolderExporter(private val context: Context) {
                 }
             }
             
-            return File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DocScanner/$baseName")
+            return File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM), "HachiCam")
         } else {
-            val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            val exportDir = File(picturesDir, "DocScanner/$baseName")
+            val dcimDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM)
+            val exportDir = File(dcimDir, "HachiCam")
             if (!exportDir.exists()) {
                 exportDir.mkdirs()
             }

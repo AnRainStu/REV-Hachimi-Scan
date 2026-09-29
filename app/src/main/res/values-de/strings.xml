@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">DocScanner</string>
+    <string name="app_name">HachiCam</string>
     <string name="camera_title">Scannen</string>
     <string name="crop_title">Anpassen</string>
     <string name="review_title">%d Seiten</string>

@@ -28,7 +28,7 @@ android {
     ndkVersion = "30.0.16248370"
 
     defaultConfig {
-        applicationId = "moe.hachimi.scan"
+        applicationId = "moe.hachimi.cam"
         minSdk = 29
         targetSdk = 35
         versionCode = 3
@@ -57,7 +57,7 @@ android {
         }
         create("hachimi") {
             dimension = "edition"
-            applicationId = "moe.hachimi.scan"
+            applicationId = "moe.hachimi.cam"
         }
     }
 

@@ -3,9 +3,9 @@
 
 <div align="center">
 
-<img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" style="border-radius: 28px;" alt="Hachimi Scan Logo" />
+<img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" style="border-radius: 28px;" alt="HachiCam Logo" />
 
-# Hachimi Scan 🐾
+# HachiCam 🐾
 
 **A vibe-coded, fully local Android document scanner.**
 
@@ -123,7 +123,7 @@ This project was developed through collaborative vibe coding with **[Google Anti
 
 1. **Regarding "Hachimi"**:
    - "Hachimi" is a popular internet community meme. Within the Chinese AI/LLM developer community, it is also widely used as an affectionate nickname for Google's **Gemini**.
-   - The project name `Hachimi Scan` serves both as a cultural tribute and as a playful nod to the software being vibe-coded with Google Antigravity / Gemini.
+   - The project name `HachiCam` serves both as a cultural tribute and as a playful nod to the software being vibe-coded with Google Antigravity / Gemini.
    - **The developers do not own, nor do they claim, any exclusive trademark or proprietary rights over the word "Hachimi".**
 
 2. **Non-Affiliation & Trademarks**:

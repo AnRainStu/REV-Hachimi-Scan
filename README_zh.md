@@ -3,9 +3,9 @@
 
 <div align="center">
 
-<img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" style="border-radius: 28px;" alt="Hachimi Scan Logo" />
+<img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" style="border-radius: 28px;" alt="HachiCam Logo" />
 
-# Hachimi Scan (哈基米扫描) 🐾
+# HachiCam (HachiCam) 🐾
 
 **纯 Vibe Coding 打造的纯本地离线 Android 文档扫描仪。**
 
@@ -123,7 +123,7 @@ cd Hachimi-Scan
 
 1. **关于“哈基米 / Hachimi”**：
    - “哈基米”源于二次元亚文化流行梗；在中文 AI 与大模型社区中，亦常被戏称为谷歌 **Google Gemini** 的萌化昵称。
-   - 本项目名称 `Hachimi Scan (哈基米扫描)` 既是对该社区流行文化的致敬，也巧妙呼应了本项目全程使用 Google Antigravity / Gemini 进行 Vibe Coding 的渊源。
+   - 本项目名称 `HachiCam` 既是对该社区流行文化的致敬，也巧妙呼应了本项目全程使用 Google Antigravity / Gemini 进行 Vibe Coding 的渊源。
    - **开发者不拥有、亦不对“Hachimi”及“哈基米”词汇主张任何独占性商标权或专有权利**。
 
 2. **第三方权利与非从属声明**：

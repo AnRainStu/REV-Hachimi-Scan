@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Hachimi Scan</string>
+    <string name="app_name">HachiCam</string>
     <string name="camera_title">Scan</string>
     <string name="crop_title">Adjust Document</string>
     <string name="review_title">%d Pages</string>
