@@ -33,7 +33,7 @@
     <string name="app_language">应用语言</string>
     <string name="select_language">选择语言</string>
     <string name="about">关于</string>
-    <string name="version">哈基米扫描 v%s</string>
+    <string name="version">HachiCam v%s</string>
     <string name="camera_permission_required">需要相机权限</string>
     <string name="grant_permission">授予权限</string>
     <string name="review">预览</string>

@@ -33,7 +33,7 @@
     <string name="app_language">App Language</string>
     <string name="select_language">Select Language</string>
     <string name="about">About</string>
-    <string name="version">Hachimi Scan v%s</string>
+    <string name="version">HachiCam v%s</string>
     <string name="camera_permission_required">Camera permission is required</string>
     <string name="grant_permission">Grant Permission</string>
     <string name="review">Review</string>
