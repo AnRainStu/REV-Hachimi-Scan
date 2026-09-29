@@ -29,6 +29,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.opencv.core.Mat
+import org.opencv.core.MatOfInt
 import org.opencv.imgcodecs.Imgcodecs
 import java.io.File
 import java.io.FileOutputStream
@@ -267,7 +268,12 @@ class CameraViewModel : ViewModel() {
                             val fusionEngine = NativeBurstFusion()
                             val fusedMat = fusionEngine.fuseBurstFrames(mats, removeGlare = true, isScreenMode = true)
                             if (!fusedMat.empty()) {
-                                Imgcodecs.imwrite(finalPhotoFile.absolutePath, fusedMat)
+                                val saveParams = MatOfInt(
+                                    Imgcodecs.IMWRITE_JPEG_QUALITY, 100,
+                                    Imgcodecs.IMWRITE_JPEG_OPTIMIZE, 1
+                                )
+                                Imgcodecs.imwrite(finalPhotoFile.absolutePath, fusedMat, saveParams)
+                                saveParams.release()
                                 fusedMat.release()
                             } else {
                                 tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
@@ -364,47 +370,27 @@ class CameraViewModel : ViewModel() {
         var photoW = 0f
         var photoH = 0f
         try {
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(file.absolutePath, boundsOpts)
+            val rawW = boundsOpts.outWidth.toFloat()
+            val rawH = boundsOpts.outHeight.toFloat()
+
             val exif = ExifInterface(file.absolutePath)
             val orientation = exif.getAttributeInt(
                 ExifInterface.TAG_ORIENTATION,
                 ExifInterface.ORIENTATION_NORMAL
             )
-            val degrees = when (orientation) {
-                ExifInterface.ORIENTATION_ROTATE_90 -> 90f
-                ExifInterface.ORIENTATION_ROTATE_180 -> 180f
-                ExifInterface.ORIENTATION_ROTATE_270 -> 270f
-                else -> 0f
-            }
+            val isSwapped = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
+                    orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                    orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                    orientation == ExifInterface.ORIENTATION_TRANSVERSE
 
-            if (degrees != 0f) {
-                val origBmp = BitmapFactory.decodeFile(file.absolutePath)
-                if (origBmp != null) {
-                    val matrix = Matrix().apply { postRotate(degrees) }
-                    val rotatedBmp = Bitmap.createBitmap(
-                        origBmp, 0, 0, origBmp.width, origBmp.height, matrix, true
-                    )
-                    FileOutputStream(file).use { out ->
-                        rotatedBmp.compress(Bitmap.CompressFormat.JPEG, 95, out)
-                    }
-                    photoW = rotatedBmp.width.toFloat()
-                    photoH = rotatedBmp.height.toFloat()
-                    if (rotatedBmp != origBmp) {
-                        rotatedBmp.recycle()
-                    }
-                    origBmp.recycle()
-
-                    val resetExif = ExifInterface(file.absolutePath)
-                    resetExif.setAttribute(
-                        ExifInterface.TAG_ORIENTATION,
-                        ExifInterface.ORIENTATION_NORMAL.toString()
-                    )
-                    resetExif.saveAttributes()
-                }
+            if (isSwapped) {
+                photoW = rawH
+                photoH = rawW
             } else {
-                val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(file.absolutePath, boundsOpts)
-                photoW = boundsOpts.outWidth.toFloat()
-                photoH = boundsOpts.outHeight.toFloat()
+                photoW = rawW
+                photoH = rawH
             }
         } catch (e: Exception) {
             e.printStackTrace()
@@ -420,9 +406,7 @@ class CameraViewModel : ViewModel() {
     }
 
     private fun getImageDimensions(file: File): Pair<Float, Float> {
-        val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, boundsOpts)
-        return Pair(boundsOpts.outWidth.toFloat(), boundsOpts.outHeight.toFloat())
+        return normalizeExifOrientation(file)
     }
 
     private fun computeTargetQuad(currentResult: DetectionResult?, photoW: Float, photoH: Float): DocumentQuad {

@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.opencv.core.Core
 import org.opencv.core.Mat
+import org.opencv.core.MatOfInt
 import org.opencv.core.Size
 import org.opencv.imgcodecs.Imgcodecs
 import org.opencv.imgproc.Imgproc
@@ -356,7 +357,12 @@ class CropViewModel : ViewModel() {
 
                     val origFile = File(page.originalImagePath)
                     val croppedFile = File(origFile.parentFile, "crop_${page.id}.jpg")
-                    Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat)
+                    val saveParams = MatOfInt(
+                        Imgcodecs.IMWRITE_JPEG_QUALITY, 100,
+                        Imgcodecs.IMWRITE_JPEG_OPTIMIZE, 1
+                    )
+                    Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat, saveParams)
+                    saveParams.release()
 
                     srcMat.release()
                     warpedMat.release()

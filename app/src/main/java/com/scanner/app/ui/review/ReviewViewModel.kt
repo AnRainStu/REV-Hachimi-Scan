@@ -20,6 +20,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.opencv.core.Core
 import org.opencv.core.Mat
+import org.opencv.core.MatOfInt
 import org.opencv.imgcodecs.Imgcodecs
 import java.io.File
 import java.io.FileOutputStream
@@ -61,7 +62,7 @@ class ReviewViewModel : ViewModel() {
                     val matrix = Matrix().apply { postRotate(90f) }
                     val rotated = Bitmap.createBitmap(bmp, 0, 0, bmp.width, bmp.height, matrix, true)
                     FileOutputStream(file).use { out ->
-                        rotated.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                        rotated.compress(Bitmap.CompressFormat.JPEG, 100, out)
                     }
                     if (rotated != bmp) rotated.recycle()
                     bmp.recycle()
@@ -111,7 +112,12 @@ class ReviewViewModel : ViewModel() {
 
                     val origFile = File(origPath)
                     val croppedFile = File(origFile.parentFile, "crop_${page.id}.jpg")
-                    Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat)
+                    val saveParams = MatOfInt(
+                        Imgcodecs.IMWRITE_JPEG_QUALITY, 100,
+                        Imgcodecs.IMWRITE_JPEG_OPTIMIZE, 1
+                    )
+                    Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat, saveParams)
+                    saveParams.release()
 
                     srcMat.release()
                     warpedMat.release()
@@ -164,7 +170,12 @@ class ReviewViewModel : ViewModel() {
 
             val origFile = File(origPath)
             val croppedFile = File(origFile.parentFile, "crop_${page.id}.jpg")
-            Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat)
+            val saveParams = MatOfInt(
+                Imgcodecs.IMWRITE_JPEG_QUALITY, 100,
+                Imgcodecs.IMWRITE_JPEG_OPTIMIZE, 1
+            )
+            Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat, saveParams)
+            saveParams.release()
 
             srcMat.release()
             warpedMat.release()

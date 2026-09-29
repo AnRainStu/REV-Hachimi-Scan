@@ -1,5 +1,8 @@
 package com.scanner.app.ui.camera
 
+import android.hardware.camera2.CaptureRequest
+import androidx.camera.camera2.interop.Camera2Interop
+import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -62,6 +65,7 @@ import com.scanner.app.ui.theme.SteadyEmerald
 import com.scanner.app.ui.theme.SteadyAmber
 import java.util.concurrent.Executors
 
+@androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
 @Composable
 fun CameraScreen(
     onNavigateToReview: () -> Unit,
@@ -194,11 +198,31 @@ fun CameraScreen(
                             it.setSurfaceProvider(previewView.surfaceProvider)
                         }
 
-                    // Maximize quality for full sensor resolution output
-                    val imageCapture = ImageCapture.Builder()
+                    // Maximize quality for full sensor resolution output with Camera2 hardware ISP tuning (SPEC_11)
+                    val imageCaptureBuilder = ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                        .setJpegQuality(100)
                         .setResolutionSelector(sensorResolutionSelector)
-                        .build()
+
+                    val camera2Extender = Camera2Interop.Extender(imageCaptureBuilder)
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.EDGE_MODE,
+                        CaptureRequest.EDGE_MODE_HIGH_QUALITY
+                    )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.NOISE_REDUCTION_MODE,
+                        CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY
+                    )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.HOT_PIXEL_MODE,
+                        CaptureRequest.HOT_PIXEL_MODE_HIGH_QUALITY
+                    )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.COLOR_CORRECTION_MODE,
+                        CaptureRequest.COLOR_CORRECTION_MODE_HIGH_QUALITY
+                    )
+
+                    val imageCapture = imageCaptureBuilder.build()
                     viewModel.imageCapture = imageCapture
 
                     val edgeDetector = NativeEdgeDetector()
