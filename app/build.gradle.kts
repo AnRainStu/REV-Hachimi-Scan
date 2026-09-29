@@ -4,6 +4,23 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+val gitCommit = try {
+    val stdout = ByteArrayOutputStream()
+    project.exec {
+        commandLine = listOf("git", "rev-parse", "--short", "HEAD")
+        standardOutput = stdout
+    }
+    stdout.toString().trim()
+} catch (e: Exception) {
+    "dev"
+}
+val buildTime = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+
 android {
     namespace = "com.scanner.app"
     compileSdk = 35
@@ -16,6 +33,9 @@ android {
         targetSdk = 35
         versionCode = 2
         versionName = "0.1.1-rc1"
+
+        buildConfigField("String", "GIT_HASH", "\"$gitCommit\"")
+        buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
         
         ndk {
             abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64")
@@ -97,6 +117,7 @@ android {
     buildFeatures {
         compose = true
         prefab = true
+        buildConfig = true
     }
     
     externalNativeBuild {

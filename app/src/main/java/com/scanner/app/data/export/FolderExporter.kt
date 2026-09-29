@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import com.scanner.app.data.util.ExifUtils
 import com.scanner.app.domain.model.ExportConfig
 import com.scanner.app.domain.model.ScannedPage
 import java.io.File
@@ -38,10 +39,16 @@ class FolderExporter(private val context: Context) {
                 
                 val uri: Uri? = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues)
                 uri?.let {
+                    val srcFile = File(page.imagePath)
                     resolver.openOutputStream(it)?.use { outStream ->
-                        FileInputStream(File(page.imagePath)).use { inStream ->
+                        FileInputStream(srcFile).use { inStream ->
                             inStream.copyTo(outStream)
                         }
+                    }
+                    val origFile = File(page.originalImagePath)
+                    val metaSource = if (origFile.exists()) origFile else srcFile
+                    resolver.openFileDescriptor(it, "rw")?.use { pfd ->
+                        ExifUtils.copyAndStampExif(metaSource, pfd.fileDescriptor)
                     }
                 }
             }
@@ -57,12 +64,16 @@ class FolderExporter(private val context: Context) {
             pages.forEachIndexed { index, page ->
                 val fileName = String.format(java.util.Locale.US, "%s-P%03d.jpg", baseName, index + 1)
                 val destFile = File(exportDir, fileName)
+                val srcFile = File(page.imagePath)
                 
-                FileInputStream(File(page.imagePath)).use { inStream ->
+                FileInputStream(srcFile).use { inStream ->
                     FileOutputStream(destFile).use { outStream ->
                         inStream.copyTo(outStream)
                     }
                 }
+                val origFile = File(page.originalImagePath)
+                val metaSource = if (origFile.exists()) origFile else srcFile
+                ExifUtils.copyAndStampExif(metaSource, destFile)
             }
             return exportDir
         }

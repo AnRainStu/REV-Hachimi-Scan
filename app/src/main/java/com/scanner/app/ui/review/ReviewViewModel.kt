@@ -7,6 +7,7 @@ import android.graphics.PointF
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scanner.app.data.repository.PageRepository
+import com.scanner.app.data.util.ExifUtils
 import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.DocumentQuad
 import com.scanner.app.domain.model.ImageFilter
@@ -66,6 +67,8 @@ class ReviewViewModel : ViewModel() {
                     }
                     if (rotated != bmp) rotated.recycle()
                     bmp.recycle()
+                    val origFile = File(page.originalImagePath)
+                    ExifUtils.copyAndStampExif(origFile, file)
                 }
             }
             val newRotation = (page.rotation + 90) % 360
@@ -118,6 +121,7 @@ class ReviewViewModel : ViewModel() {
                     )
                     Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat, saveParams)
                     saveParams.release()
+                    ExifUtils.copyAndStampExif(origFile, croppedFile)
 
                     srcMat.release()
                     warpedMat.release()
@@ -176,6 +180,7 @@ class ReviewViewModel : ViewModel() {
             )
             Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat, saveParams)
             saveParams.release()
+            ExifUtils.copyAndStampExif(origFile, croppedFile)
 
             srcMat.release()
             warpedMat.release()

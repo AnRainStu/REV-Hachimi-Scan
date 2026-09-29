@@ -6,6 +6,7 @@ import android.graphics.PointF
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scanner.app.data.repository.PageRepository
+import com.scanner.app.data.util.ExifUtils
 import com.scanner.app.domain.model.DocumentQuad
 import com.scanner.app.domain.model.ImageFilter
 import com.scanner.app.domain.model.ScannedPage
@@ -363,6 +364,7 @@ class CropViewModel : ViewModel() {
                     )
                     Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat, saveParams)
                     saveParams.release()
+                    ExifUtils.copyAndStampExif(origFile, croppedFile)
 
                     srcMat.release()
                     warpedMat.release()

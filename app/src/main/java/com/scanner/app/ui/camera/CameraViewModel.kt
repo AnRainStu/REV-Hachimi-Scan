@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.scanner.app.data.repository.PageRepository
+import com.scanner.app.data.util.ExifUtils
 import com.scanner.app.domain.model.DetectionResult
 import com.scanner.app.domain.model.DocumentQuad
 import com.scanner.app.domain.model.ImageFilter
@@ -173,6 +174,7 @@ class CameraViewModel : ViewModel() {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                     viewModelScope.launch(Dispatchers.Default) {
                         val (photoW, photoH) = normalizeExifOrientation(photoFile)
+                        ExifUtils.stampSignature(photoFile)
                         val currentResult = _detectedQuad.value
                         val finalQuad = computeTargetQuad(currentResult, photoW, photoH)
 
@@ -275,18 +277,21 @@ class CameraViewModel : ViewModel() {
                                 Imgcodecs.imwrite(finalPhotoFile.absolutePath, fusedMat, saveParams)
                                 saveParams.release()
                                 fusedMat.release()
-                                copyExifMetadata(tempFiles[0], finalPhotoFile)
+                                ExifUtils.copyAndStampExif(tempFiles[0], finalPhotoFile)
                             } else {
                                 tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
+                                ExifUtils.stampSignature(finalPhotoFile)
                             }
                             for (m in mats) {
                                 m.release()
                             }
                         } else if (mats.size == 1) {
                             tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
+                            ExifUtils.stampSignature(finalPhotoFile)
                             mats[0].release()
                         } else {
                             tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
+                            ExifUtils.stampSignature(finalPhotoFile)
                         }
                     }
 
@@ -408,34 +413,6 @@ class CameraViewModel : ViewModel() {
 
     private fun getImageDimensions(file: File): Pair<Float, Float> {
         return normalizeExifOrientation(file)
-    }
-
-    private fun copyExifMetadata(srcFile: File, dstFile: File) {
-        try {
-            val srcExif = ExifInterface(srcFile.absolutePath)
-            val dstExif = ExifInterface(dstFile.absolutePath)
-            val tags = arrayOf(
-                ExifInterface.TAG_EXPOSURE_TIME,
-                ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY,
-                ExifInterface.TAG_F_NUMBER,
-                ExifInterface.TAG_FOCAL_LENGTH,
-                ExifInterface.TAG_WHITE_BALANCE,
-                ExifInterface.TAG_DATETIME,
-                ExifInterface.TAG_DATETIME_ORIGINAL,
-                ExifInterface.TAG_DATETIME_DIGITIZED,
-                ExifInterface.TAG_MAKE,
-                ExifInterface.TAG_MODEL
-            )
-            for (tag in tags) {
-                val value = srcExif.getAttribute(tag)
-                if (value != null) {
-                    dstExif.setAttribute(tag, value)
-                }
-            }
-            dstExif.saveAttributes()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
     }
 
     private fun computeTargetQuad(currentResult: DetectionResult?, photoW: Float, photoH: Float): DocumentQuad {
