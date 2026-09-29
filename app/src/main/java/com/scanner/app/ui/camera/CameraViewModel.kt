@@ -234,7 +234,7 @@ class CameraViewModel : ViewModel() {
                     tempFiles.add(file0)
                 }
 
-                // Frame 1: EV = targetHighlightIndex (Highlight frame: LCD/OLED screen text unclipped)
+                // Frame 1: EV = targetHighlightIndex (Highlight frame: unclipped clouds, screens & specular highlights per SPEC_10)
                 if (targetHighlightIndex < 0 && control != null) {
                     setExposureIndex(control, context, targetHighlightIndex)
                 }
@@ -242,16 +242,6 @@ class CameraViewModel : ViewModel() {
                 if (takeSinglePicture(capture, context, file1) && file1.exists() && file1.length() > 0) {
                     normalizeExifOrientation(file1)
                     tempFiles.add(file1)
-                }
-
-                // Frame 2: EV = 0 (Denoise & temporal redundancy frame)
-                if (targetHighlightIndex < 0 && control != null) {
-                    setExposureIndex(control, context, 0)
-                }
-                val file2 = File(context.cacheDir, "burst_${UUID.randomUUID()}_2.jpg")
-                if (takeSinglePicture(capture, context, file2) && file2.exists() && file2.length() > 0) {
-                    normalizeExifOrientation(file2)
-                    tempFiles.add(file2)
                 }
 
                 if (tempFiles.isEmpty()) {
