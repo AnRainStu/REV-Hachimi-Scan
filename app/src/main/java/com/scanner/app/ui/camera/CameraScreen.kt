@@ -221,6 +221,18 @@ fun CameraScreen(
                         CaptureRequest.COLOR_CORRECTION_MODE,
                         CaptureRequest.COLOR_CORRECTION_MODE_HIGH_QUALITY
                     )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.SHADING_MODE,
+                        CaptureRequest.SHADING_MODE_HIGH_QUALITY
+                    )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.DISTORTION_CORRECTION_MODE,
+                        CaptureRequest.DISTORTION_CORRECTION_MODE_HIGH_QUALITY
+                    )
+                    camera2Extender.setCaptureRequestOption(
+                        CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE,
+                        CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY
+                    )
 
                     val imageCapture = imageCaptureBuilder.build()
                     viewModel.imageCapture = imageCapture

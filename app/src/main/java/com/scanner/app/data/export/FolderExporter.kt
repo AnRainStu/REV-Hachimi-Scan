@@ -18,11 +18,17 @@ class FolderExporter(private val context: Context) {
         val folderName = config.name
         val resolver = context.contentResolver
 
+        val baseName = if (folderName.isNotBlank()) {
+            folderName
+        } else {
+            java.text.SimpleDateFormat("yyyyMMdd-HHmm", java.util.Locale.getDefault()).format(java.util.Date())
+        }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            val relativePath = Environment.DIRECTORY_PICTURES + File.separator + "DocScanner" + File.separator + folderName
+            val relativePath = Environment.DIRECTORY_PICTURES + File.separator + "DocScanner" + File.separator + baseName
             
             pages.forEachIndexed { index, page ->
-                val fileName = String.format("page_%03d.jpg", index + 1)
+                val fileName = String.format(java.util.Locale.US, "%s-P%03d.jpg", baseName, index + 1)
                 
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
@@ -40,16 +46,16 @@ class FolderExporter(private val context: Context) {
                 }
             }
             
-            return File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DocScanner/$folderName")
+            return File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "DocScanner/$baseName")
         } else {
             val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
-            val exportDir = File(picturesDir, "DocScanner/$folderName")
+            val exportDir = File(picturesDir, "DocScanner/$baseName")
             if (!exportDir.exists()) {
                 exportDir.mkdirs()
             }
             
             pages.forEachIndexed { index, page ->
-                val fileName = String.format("page_%03d.jpg", index + 1)
+                val fileName = String.format(java.util.Locale.US, "%s-P%03d.jpg", baseName, index + 1)
                 val destFile = File(exportDir, fileName)
                 
                 FileInputStream(File(page.imagePath)).use { inStream ->

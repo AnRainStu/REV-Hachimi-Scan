@@ -266,7 +266,7 @@ class CameraViewModel : ViewModel() {
 
                         if (mats.size >= 2) {
                             val fusionEngine = NativeBurstFusion()
-                            val fusedMat = fusionEngine.fuseBurstFrames(mats, removeGlare = true, isScreenMode = true)
+                            val fusedMat = fusionEngine.fuseBurstFrames(mats, removeGlare = false, isScreenMode = false)
                             if (!fusedMat.empty()) {
                                 val saveParams = MatOfInt(
                                     Imgcodecs.IMWRITE_JPEG_QUALITY, 100,
