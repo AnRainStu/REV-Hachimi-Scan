@@ -218,16 +218,18 @@ fun AspectRatioBanner(
         )
     }
 
-    // Direct access items requested in bottom row: A4, 4:3, 8:7
+    // Direct access items requested in bottom row: A4, 4:3, 8:7, 21:9
     val rowPresets = listOf(
         AspectRatioPreset.A4,
         AspectRatioPreset.RATIO_4_3,
-        AspectRatioPreset.RATIO_8_7
+        AspectRatioPreset.RATIO_8_7,
+        AspectRatioPreset.RATIO_21_9
     )
 
-    // Items inside the pull-up list: A3, 8开, 16开, 正方形
+    // Items inside the pull-up list: A3, 16:9, 8开, 16开, 正方形
     val dropdownPresets = listOf(
         AspectRatioPreset.A3,
+        AspectRatioPreset.RATIO_16_9,
         AspectRatioPreset.K8,
         AspectRatioPreset.K16,
         AspectRatioPreset.SQUARE
@@ -243,7 +245,7 @@ fun AspectRatioBanner(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
-        // Quick items: A4, 4:3, 8:7
+        // Quick items: A4, 4:3, 8:7, 21:9
         rowPresets.forEach { preset ->
             val isSelected = selectedRatio == preset
             val bg = if (isSelected) PrismCyan.copy(alpha = 0.25f) else Color(0x22FFFFFF)
@@ -264,6 +266,7 @@ fun AspectRatioBanner(
                         AspectRatioPreset.A4 -> "A4"
                         AspectRatioPreset.RATIO_4_3 -> "4:3"
                         AspectRatioPreset.RATIO_8_7 -> "8:7"
+                        AspectRatioPreset.RATIO_21_9 -> "21:9"
                         else -> stringResource(preset.titleRes)
                     },
                     fontSize = 12.sp,
@@ -316,6 +319,7 @@ fun AspectRatioBanner(
                     text = if (isDropdownSelected) {
                         when (selectedRatio) {
                             AspectRatioPreset.A3 -> "A3"
+                            AspectRatioPreset.RATIO_16_9 -> "16:9"
                             AspectRatioPreset.K8 -> stringResource(R.string.ratio_8k)
                             AspectRatioPreset.K16 -> stringResource(R.string.ratio_16k)
                             AspectRatioPreset.SQUARE -> stringResource(R.string.ratio_square)
@@ -349,6 +353,7 @@ fun AspectRatioBanner(
                             Text(
                                 text = when (preset) {
                                     AspectRatioPreset.A3 -> "A3 (横版 A4)"
+                                    AspectRatioPreset.RATIO_16_9 -> "16:9"
                                     AspectRatioPreset.K8 -> "8开"
                                     AspectRatioPreset.K16 -> "16开"
                                     AspectRatioPreset.SQUARE -> "正方形 (1:1)"
@@ -407,11 +412,13 @@ fun AspectRatioSidePanel(
         AspectRatioPreset.A4,
         AspectRatioPreset.RATIO_4_3,
         AspectRatioPreset.RATIO_8_7,
+        AspectRatioPreset.RATIO_21_9,
         AspectRatioPreset.CUSTOM
     )
 
     val dropdownPresets = listOf(
         AspectRatioPreset.A3,
+        AspectRatioPreset.RATIO_16_9,
         AspectRatioPreset.K8,
         AspectRatioPreset.K16,
         AspectRatioPreset.SQUARE
@@ -440,6 +447,7 @@ fun AspectRatioSidePanel(
                         AspectRatioPreset.A4 -> "A4"
                         AspectRatioPreset.RATIO_4_3 -> "4:3"
                         AspectRatioPreset.RATIO_8_7 -> "8:7"
+                        AspectRatioPreset.RATIO_21_9 -> "21:9"
                         AspectRatioPreset.CUSTOM -> stringResource(R.string.ratio_custom)
                         else -> stringResource(preset.titleRes)
                     },
@@ -486,6 +494,7 @@ fun AspectRatioSidePanel(
                         Text(
                             text = when (selectedRatio) {
                                 AspectRatioPreset.A3 -> "A3"
+                                AspectRatioPreset.RATIO_16_9 -> "16:9"
                                 AspectRatioPreset.K8 -> stringResource(R.string.ratio_8k)
                                 AspectRatioPreset.K16 -> stringResource(R.string.ratio_16k)
                                 AspectRatioPreset.SQUARE -> stringResource(R.string.ratio_square)
@@ -519,6 +528,7 @@ fun AspectRatioSidePanel(
                                 Text(
                                     text = when (preset) {
                                         AspectRatioPreset.A3 -> "A3 (横版 A4)"
+                                        AspectRatioPreset.RATIO_16_9 -> "16:9"
                                         AspectRatioPreset.K8 -> "8开"
                                         AspectRatioPreset.K16 -> "16开"
                                         AspectRatioPreset.SQUARE -> "正方形 (1:1)"

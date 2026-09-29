@@ -29,7 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.Crop
@@ -80,40 +82,107 @@ fun ReviewScreen(
         pages.find { it.id == selectedPageId }
     }
 
+    var isMultiSelectMode by remember { mutableStateOf(false) }
+    val selectedPageIds = remember { mutableStateListOf<String>() }
+
+    BackHandler(enabled = isMultiSelectMode) {
+        isMultiSelectMode = false
+        selectedPageIds.clear()
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
         topBar = {
             TopAppBar(
                 title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    if (isMultiSelectMode) {
                         Text(
-                            text = stringResource(R.string.camera_title),
+                            text = stringResource(R.string.selected_count, selectedPageIds.size),
                             fontWeight = FontWeight.Bold
                         )
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            modifier = Modifier.padding(start = 4.dp)
+                    } else {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = stringResource(R.string.review_title, pages.size),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                text = stringResource(R.string.camera_title),
+                                fontWeight = FontWeight.Bold
                             )
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier.padding(start = 4.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.review_title, pages.size),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
                         }
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateToCamera) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.camera_title)
-                        )
+                    if (isMultiSelectMode) {
+                        IconButton(onClick = {
+                            isMultiSelectMode = false
+                            selectedPageIds.clear()
+                        }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = stringResource(R.string.close)
+                            )
+                        }
+                    } else {
+                        IconButton(onClick = onNavigateToCamera) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.camera_title)
+                            )
+                        }
+                    }
+                },
+                actions = {
+                    if (isMultiSelectMode) {
+                        val allSelected = pages.isNotEmpty() && selectedPageIds.size == pages.size
+                        TextButton(onClick = {
+                            if (allSelected) {
+                                selectedPageIds.clear()
+                            } else {
+                                selectedPageIds.clear()
+                                selectedPageIds.addAll(pages.map { it.id })
+                            }
+                        }) {
+                            Text(
+                                text = stringResource(if (allSelected) R.string.deselect_all else R.string.select_all),
+                                color = PrismCyan,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    } else {
+                        if (pages.isNotEmpty()) {
+                            TextButton(onClick = {
+                                isMultiSelectMode = true
+                                selectedPageIds.clear()
+                            }) {
+                                Icon(
+                                    imageVector = Icons.Default.AspectRatio,
+                                    contentDescription = null,
+                                    tint = PrismCyan,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = stringResource(R.string.batch_ratio),
+                                    color = PrismCyan,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -122,61 +191,108 @@ fun ReviewScreen(
             )
         },
         bottomBar = {
-            // Floating Dock Action Bar
-            Surface(
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (isMultiSelectMode) {
+                Surface(
+                    tonalElevation = 6.dp,
+                    shadowElevation = 10.dp,
+                    color = Color(0xF20F172A),
+                    border = BorderStroke(1.dp, Color(0x33FFFFFF)),
+                    shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = onNavigateToCamera,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        contentPadding = PaddingValues(vertical = 12.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.AddAPhoto,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.add_more),
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        if (selectedPageIds.isEmpty()) {
+                            Text(
+                                text = stringResource(R.string.batch_ratio_hint),
+                                color = Color.White.copy(alpha = 0.7f),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.padding(vertical = 12.dp)
+                            )
+                        } else {
+                            Text(
+                                text = stringResource(R.string.batch_apply_title, selectedPageIds.size),
+                                color = Color.White,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                            )
+                            AspectRatioBanner(
+                                selectedRatio = AspectRatioPreset.CUSTOM,
+                                customRatioValue = null,
+                                onSelectRatio = { preset ->
+                                    viewModel.setBatchAspectRatio(selectedPageIds.toList(), preset)
+                                },
+                                onSelectCustomRatio = { customRatio ->
+                                    viewModel.setBatchCustomRatio(selectedPageIds.toList(), customRatio)
+                                },
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
                     }
-
-                    Button(
-                        onClick = {
-                            showExportDialog = true
-                            onExport()
-                        },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(16.dp),
-                        enabled = pages.isNotEmpty(),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary
-                        ),
-                        contentPadding = PaddingValues(vertical = 12.dp)
+                }
+            } else {
+                // Floating Dock Action Bar
+                Surface(
+                    tonalElevation = 6.dp,
+                    shadowElevation = 8.dp,
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Share,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.export),
-                            fontWeight = FontWeight.Bold
-                        )
+                        OutlinedButton(
+                            onClick = onNavigateToCamera,
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AddAPhoto,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.add_more),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                showExportDialog = true
+                                onExport()
+                            },
+                            modifier = Modifier.weight(1f),
+                            shape = RoundedCornerShape(16.dp),
+                            enabled = pages.isNotEmpty(),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary
+                            ),
+                            contentPadding = PaddingValues(vertical = 12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Share,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.export),
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
@@ -245,15 +361,27 @@ fun ReviewScreen(
                         } else null
                     }
 
+                    val isSelected = selectedPageIds.contains(page.id)
+
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
                             .aspectRatio(0.72f)
                             .clip(RoundedCornerShape(16.dp))
-                            .clickable { viewModel.selectPage(page.id) },
+                            .clickable {
+                                if (isMultiSelectMode) {
+                                    if (isSelected) selectedPageIds.remove(page.id)
+                                    else selectedPageIds.add(page.id)
+                                } else {
+                                    viewModel.selectPage(page.id)
+                                }
+                            },
                         shape = RoundedCornerShape(16.dp),
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        border = BorderStroke(
+                            if (isMultiSelectMode && isSelected) 2.5.dp else 1.dp,
+                            if (isMultiSelectMode && isSelected) PrismCyan else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = if (isSelected) 6.dp else 2.dp)
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             if (bitmap != null) {
@@ -292,23 +420,46 @@ fun ReviewScreen(
                                 )
                             }
 
-                            // Top-Right Circular Delete Button
-                            Box(
-                                modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(8.dp)
-                                    .size(30.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(0xBB0A0F1D))
-                                    .clickable { viewModel.deletePage(page.id) },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = stringResource(R.string.delete_page),
-                                    tint = Color(0xFFFF6B6B),
-                                    modifier = Modifier.size(16.dp)
-                                )
+                            if (isMultiSelectMode) {
+                                // Top-Right Selection Indicator Pill
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) PrismCyan else Color(0xBB0A0F1D))
+                                        .border(1.5.dp, if (isSelected) PrismCyan else Color.White.copy(alpha = 0.8f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (isSelected) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Selected",
+                                            tint = Color(0xFF0F172A),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            } else {
+                                // Top-Right Circular Delete Button
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(8.dp)
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xBB0A0F1D))
+                                        .clickable { viewModel.deletePage(page.id) },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = stringResource(R.string.delete_page),
+                                        tint = Color(0xFFFF6B6B),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -666,6 +817,39 @@ fun ReviewScreen(
                         )
                     }
                 }
+            }
+        }
+    }
+
+    // Batch aspect ratio processing spinner when on grid
+    AnimatedVisibility(
+        visible = isProcessing && selectedPage == null,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.align(Alignment.Center)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xEE0F172A),
+            border = BorderStroke(1.dp, Color(0x33FFFFFF)),
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    color = PrismCyan,
+                    strokeWidth = 2.5.dp
+                )
+                Text(
+                    text = stringResource(R.string.batch_processing, selectedPageIds.size.coerceAtLeast(1)),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Color.White,
+                    fontWeight = FontWeight.Medium
+                )
             }
         }
     }

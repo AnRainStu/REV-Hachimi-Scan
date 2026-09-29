@@ -10,6 +10,7 @@ enum class AspectRatioPreset(
     A3(R.string.ratio_a3, 297f / 210f),        // 1.4142 (landscape ISO standard)
     RATIO_4_3(R.string.ratio_4_3, 4f / 3f),    // 1.3333
     RATIO_16_9(R.string.ratio_16_9, 16f / 9f), // 1.7778
+    RATIO_21_9(R.string.ratio_21_9, 21f / 9f), // 2.3333
     RATIO_8_7(R.string.ratio_8_7, 8f / 7f),    // 1.1429 (PPT projector / sensor native)
     K8(R.string.ratio_8k, 260f / 370f),        // 0.7027 (8开 standard paper)
     K16(R.string.ratio_16k, 185f / 260f),      // 0.7115 (16开 standard textbook)
