@@ -1,20 +1,19 @@
 > [!NOTE]
-> 本项目的作者完全通过 Vibe Coding 构建了本项目，且并不完全清楚这个 Agent 到底偷偷写了些什么代码。 ¯\\\_(ツ)\_/¯
+> 本项目是个人开发者借助 AI 结对编写的实验性开源项目，旨在探索 Android 端侧计算摄影、Camera2 底层调优与经典计算机视觉算法的画质上限。项目仍处于早期迭代阶段，难免存在未充分打磨的工程缺陷与技术债务，欢迎社区开发者指正、讨论与提交 PR。
 
 <div align="center">
 
 <img src="app/src/hachimi/res/mipmap-xxxhdpi/ic_launcher.png" width="128" height="128" style="border-radius: 28px;" alt="HachiCam Logo" />
 
-# HachiCam (HachiCam) 🐾
+# HachiCam 🐾
 
-**纯 Vibe Coding 打造的纯本地离线 Android 文档扫描仪。**
+**专注于画质还原与低层计算摄影的纯本地 Android 文档扫描仪。**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Specs: CC0 1.0](https://img.shields.io/badge/Specs-CC0%201.0-lightgrey.svg)](specs/LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android%2010%2B-green.svg)](https://developer.android.com)
 [![Engine](https://img.shields.io/badge/Engine-OpenCV%204.10%20%2B%20C%2B%2B17-orange.svg)](app/src/main/cpp)
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-purple.svg)](https://developer.android.com/jetpack/compose)
-[![Engineered with Antigravity](https://img.shields.io/badge/Engineered%20with-Antigravity-6C5CE7?logo=google&logoColor=white)](https://deepmind.google)
 
 *无广告、零追踪、无需联网权限。100% 本地端侧处理。*
 
@@ -24,55 +23,72 @@
 
 ---
 
-## 🌟 核心特性
+## 💡 设计初衷与技术取舍 (Design Rationale)
 
-### 1. 屏幕拍摄防过曝与连拍 HDR (SPEC_08 Screen HDR)
-* **动态 EV 曝光包围流水线**：
-  - 针对拍摄高发光屏幕（电脑显示器、笔记本、平板）时的死白过曝痛点，相机在稳定触发时自动执行三帧包围曝光（`EV 0` / `EV -2.0` / `EV 0`）。
-  - 将过饱和高光压制至传感器线性响应区，完美还原屏幕内的文字细节、表格边框与浅色 UI。
-* **Tom Mertens 多分辨率多曝光金字塔融合**：
-  - 基于良好曝光度、对比度与饱和度指标，通过拉普拉斯/高斯金字塔实现多尺度平滑无缝融合，彻底消除明暗交界处的光晕伪影（Halo Artifacts）。
-* **亚像素单应性软件防抖与防鬼影**：
-  - 全景 ORB 关键点提取 + RANSAC 8 自由度单应性解算，消除手持微颤；
-  - 像素级色差防鬼影过滤（$\Delta_{\text{diff}} \le 22$），拒绝重影发虚。
-* **硬性高光死白置换**：
-  - 基准帧死白截断区域强制采用低曝光帧真实清晰纹理覆盖，确保屏幕文字锐利清晰。
+在 Android 生态中，已有不少开箱即用的扫码组件（如 ML Kit Document Scanner）与文档扫描应用，但本项目之所以选择从底层自建 OpenCV C++ 引擎与 Camera2 ISP 管线，源于以下核心考虑：
 
-### 2. 图像处理与文档滤镜
-* **Retinex 魔法色彩 (Magic Color)**：
-  - 基于 CIE-Lab 色彩空间解耦，单独处理 L 通道低频光照场。
-  - 照度除法模型（$R = S / L \times 255$）结合动态白平衡，有效消除阴影折痕，还原纸张白度，完美保留彩色笔迹与印章印迹。
-* **Sauvola 局部自适应二值化 (B&W Document)**：
-  - 积分图极速计算局部动态阈值，在彻底消除复印杂底阴影的同时，保证极细文字笔画不断裂。
-* **平滑灰度模式 (Grayscale)**：
-  - 针对证件复印、铅笔素描与发票票据提供高保真宽动态范围灰度拉伸。
-
-### 3. 透视校正与画幅比例预设
-* **底部比例选择器 Banner**：
-  - 采用底部水平胶囊 Banner 设计，彻底解放裁剪画布，杜绝四角调整手柄被遮挡的情况。
-  - 丰富画幅比例一键切换：`A4`（标准文档）、`A3`、`4:3`、`16:9`、`8:7`（现代移动传感器满画幅与 PPT 比例）以及自然拉正的 `自定义`。
-* **透视缩短补偿恢复 (Foreshortening Recovery)**：
-  - 倾斜俯拍时自适应补偿几何纵向压缩，准确还原文档物理纵横比。
-
-### 4. 边缘检测与裁剪微调
-* **LSD 结构线段检测与磁吸贴边**：
-  - 实时分析文档几何物理边界，支持角点与边缘磁吸吸附。
-* **2.8x 悬浮放大镜 (Loupe)**：
-  - 拖拽角点手柄时实时显示带十字准星的高清放大镜，支持像素级精准定位。
-
-### 5. 交互体验与手势动画
-* **三段式焦点缩放与平移**：
-  - 双击手势：`1.0x` $\to$ `2.5x` $\to$ `4.5x` $\to$ `1.0x` 点击点中心对齐缩放；
-  - 双指自由捏合缩放（`1.0x ~ 5.0x`）与弹性边界回弹。
-* **平滑 90° 旋转过渡动画**。
-
-### 6. 本地离线与隐私保护
-* **100% 本地运算**：底层 C++ NDK 与 OpenCV 算法全部运行在设备本地。
-* **绝对纯净隐私**：无需注册登录、无任何网络通信权限、无第三方数据收集或统计 SDK。
+1. **画质优先与原始传感器吞吐**：
+   - 绝大多数通用扫描 SDK 优先考虑低算力设备上的实时性，通常对取景流强制降采样至 1080p，并伴随较重的降噪涂抹与有损压缩，导致纸张细微纤维、图表浅色网点与细笔画断裂丢失。
+   - 为了追求更高的文档归档画质，本项目接管底层 Camera2 硬件 ISP（关闭软防抖画幅裁剪、开启高品质降噪与边缘增强、启用硬件光学防抖 OIS），并在 C++ 层实现了基于手持微晃动的亚像素超分辨率重构，尽可能发挥手机摄像头的物理光学解析力。
+2. **纯粹离线与零 GMS 依赖 (De-Googled)**：
+   - 常见商业 SDK 往往依赖闭源的 Google Play Services (GMS) 动态分发。
+   - HachiCam **不申请 `INTERNET` 联网权限**，底层无任何 Google Play 服务依赖，原生适配 LineageOS、GrapheneOS 等开源无 GMS 定制系统，以及无 Google 服务的网络环境。
+3. **算法确定性与数学可解释性**：
+   - 不依赖端侧不可控的生成式 AI（避免字符被“脑补”或篡改），全部基于经典图像处理理论（Retinex 照度分解、Sauvola 局部二值化、ORB/RANSAC 几何对齐、Mertens 多曝光金字塔融合）实现透明、可审计的文档复原。
 
 ---
 
-## 🛠️ 构建与运行
+## 🌟 核心功能
+
+### 1. 相机与计算摄影 (Camera & Computational Photography)
+* **硬件级 ISP 调优**：
+  - 通过 Camera2Interop 注入高画质捕获请求，启用传感器硬件级光学防抖（OIS）与精细色调映射。
+* **多帧超分辨率连拍 (50MP Super-Res，实验性)**：
+  - 针对手持拍摄时的生理微颤（$0.1 \sim 0.8\text{ px}$ 亚像素位移），通过 ORB 特征与 RANSAC 计算亚像素单应性矩阵，在 $2\times$ 物理画布上进行多相累加融合，重构超越单帧传感器采样的高频光学细节并抑制反光。
+* **横竖屏自适应与方向感知**：
+  - 取景界面与操作按钮支持全向动态旋转，拍摄时自动校正物理像素与 EXIF 朝向，便于横向拍摄长条形标牌与宽幅书籍。
+
+### 2. 边缘检测与几何校正 (Edge Detection & Perspective)
+* **文字显著度与长宽比放宽**：
+  - 引入 Sobel 梯度积分图，对候选多边形内部的高频笔画能量（Text Saliency）进行快速评估，在复杂背景下优先锁定写有文字的标牌，避免误选反光玻璃窗。
+  - 支持高达 $12:1$ 的长宽比识别，适配地铁站牌、条幅与收银小票。
+* **交互式四边形裁剪与 2.8x 放大镜**：
+  - 拖拽角点时唤起带十字准星的高清浮动放大镜，支持像素级精确定位。
+  - 提供 A4、A3、4:3、16:9、8:7 及自定义比例快速切换，并内置俯仰角透视缩短补偿。
+
+### 3. 图像增强滤镜 (Document Filters)
+* **Retinex 魔法色彩 (Magic Color)**：
+  - 在 CIE-Lab 色彩空间解耦 L 亮度通道，利用低频照度除法模型消除阴影与纸张折痕，结合动态白平衡还原纸白，完整保留彩色笔迹与公章。
+* **Sauvola 局部自适应二值化 (B&W Document)**：
+  - 基于双精度积分图快速计算局部动态阈值，在去除复印底灰的同时保护极细文字线条不断裂。
+* **平滑灰度 (Grayscale)**：
+  - 针对票据、证件复印件提供宽动态范围的对比度拉伸。
+
+### 4. 纯净隐私与导出 (Privacy & Export)
+* **100% 本地运算**：全链路 C++ NDK 与 OpenCV 算法在设备本地完成。
+* **零追踪、零权限**：无账户系统、无网络通信、无第三方分析统计 SDK。
+* **标准文档导出**：基于 Android 原生 `PdfDocument` 组装高清矢量 PDF，支持批量 JPEG 导出。
+
+---
+
+## ⚠️ 已知不足与技术债务 (Known Issues & Tech Debt)
+
+客观而言，本项目由作者与 AI 结对进行快速原型探索，当前版本存在较为明显的工程短板，我们并不回避这些问题，并已列入后续重构计划：
+
+1. **磁盘文件 I/O 往返开销**：
+   - 目前连拍与多帧融合采用了“落盘 JPEG $\to$ C++ 解码 $\to$ 算法处理 $\to$ 重新编码”的保守机制，引入了不必要的磁盘读写延迟与有损重编损耗。未来计划重构成基于 `ImageProxy` / `HardwareBuffer` 的零拷贝内存共享管线。
+2. **大单体组件待解耦**：
+   - `CameraScreen` 与 `CameraViewModel` 承担了过多职责（传感器监听、CameraX 绑定、动效交互、捕获流水线），后续将逐步拆分为遵循单一职责原则的 UseCase 与 Controller。
+3. **缺少持久化数据库支撑**：
+   - 当前已扫描页面临时存储在内存 StateFlow 列表中，如未及时导出且遭遇系统杀后台（Process Death），存在批次丢失风险，需引入 Room SQLite 持久化支持。
+4. **JNI 原生指针与类型安全**：
+   - JNI 接口层存在较多裸指针地址（`jlong matAddr`）传递，有待补充更为规范的 RAII 资源安全封装。
+
+欢迎大家提出宝贵批评，也期待社区有经验的开发者提交 PR 共同改进。
+
+---
+
+## 🛠️ 构建与运行 (Build & Run)
 
 ### 环境要求
 * Android Studio Ladybug (2024.2.1) 或更高版本
@@ -88,7 +104,7 @@
 git clone https://github.com/eviau512/Hachimi-Scan.git
 cd Hachimi-Scan
 
-# 构建哈基米 Release APK (带自签名配置)
+# 构建 Release APK (HachiCam 定制版)
 ./gradlew assembleHachimiRelease
 
 # 或构建标准版 Release APK
@@ -99,33 +115,19 @@ cd Hachimi-Scan
 
 ---
 
-## 📄 开源许可证与版权声明
+## 📄 架构规格书 (Specifications)
 
-本项目实行分层开源与版权政策：
-
-* **核心源代码 (Source Code)**：遵循 **[GNU General Public License v3 (GPLv3)](LICENSE)** 开源协议，保障代码自由与开放。
-* **技术规范与架构文档 (`specs/`)**：基于 **[Creative Commons Zero v1.0 (CC0 1.0)](specs/LICENSE)** 贡献至公有领域，方便技术交流与洁净室参考。
-* **应用图标及衍生美术资产 (Artwork & Visual Assets)**：
-  - 本项目曾考虑采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) 协议，但由于应用内所用到的图标、角色及插画元素衍生自中文互联网社区同人漫画（源自「LLM娘」及大肥鱼漫画相关二创/网络表情文化），开发者并不拥有其原始独立版权；
-  - 鉴于原作者的具体版权保留政策以及是否存在许可证延续/传染（ShareAlike）尚未完全明确，本项目**不对相关美术形象主张任何专有版权**；相关素材仅出于开源社区同好交流与非商业展示目的使用；
-  - 若原作者对相关美术元素的使用有任何异议或提出要求，请随时提交 Issue，我们将第一时间配合替换或移除；
-  - ⚠️ **下游分发提示**：若二次分发、修改发布或商业化衍生本项目，请注意相关美术资产的版权归属风险，强烈建议替换为您自己拥有完整版权的应用图标与插图。
+本项目核心算法均配有详细的设计与数学规范，存放在 [`specs/`](specs/) 目录下（采用 CC0 1.0 公共领域贡献）：
+* [`SPEC_00_ARCHITECTURE_AND_TECH_STACK.md`](specs/SPEC_00_ARCHITECTURE_AND_TECH_STACK.md)：系统整体分层架构、数据流与技术栈全景
+* [`SPEC_01_RETINEX_MAGIC_COLOR_ENGINE.md`](specs/SPEC_01_RETINEX_MAGIC_COLOR_ENGINE.md)：Retinex CIE-Lab 照度分解数学模型
+* [`SPEC_02_ADAPTIVE_BINARIZATION_ENGINE.md`](specs/SPEC_02_ADAPTIVE_BINARIZATION_ENGINE.md)：Sauvola 积分图局部自适应二值化
+* [`SPEC_04_BURST_FUSION_ENGINE.md`](specs/SPEC_04_BURST_FUSION_ENGINE.md)：多帧配准融合与 50MP 亚像素超分辨率
+* [`SPEC_15_METRO_SIGN_AND_TEXT_SALIENCY_DETECTION.md`](specs/SPEC_15_METRO_SIGN_AND_TEXT_SALIENCY_DETECTION.md)：大长宽比标牌识别与 Sobel 积分图笔画显著度打分
 
 ---
 
-## 🤖 开发致谢
+## 📄 开源许可证与声明
 
-本项目由作者通过与 **[Google Antigravity](https://deepmind.google)** 深度结对 Vibe Coding 协作完成，涵盖全链路底层 C++ NDK 图像算法研发及 Jetpack Compose 现代化界面工程。
-
----
-
-## ⚖️ 免责声明与商标声明
-
-1. **关于“哈基米 / Hachimi”**：
-   - “哈基米”源于二次元亚文化流行梗；在中文 AI 与大模型社区中，亦常被戏称为谷歌 **Google Gemini** 的萌化昵称。
-   - 本项目名称 `HachiCam` 既是对该社区流行文化的致敬，也巧妙呼应了本项目全程使用 Google Antigravity / Gemini 进行 Vibe Coding 的渊源。
-   - **开发者不拥有、亦不对“Hachimi”及“哈基米”词汇主张任何独占性商标权或专有权利**。
-
-2. **第三方权利与非从属声明**：
-   - 本项目为独立的自由开源工具，与任何拥有相关文化元素的版权方（包括但不限于 Cygames 等）无官方关联、赞助或背书关系。
-   - 文档及代码中出现的所有第三方产品名称、商标及标识，其知识产权均归其各自所有者所有。
+* **源代码**：遵循 **[GNU General Public License v3 (GPLv3)](LICENSE)**。
+* **规范文档**：遵循 **[Creative Commons Zero v1.0 (CC0 1.0)](specs/LICENSE)**。
+* **美术资产**：应用内部分图标及表情元素衍生自中文社区同人文化二创，开发者不对相关形象主张专有版权；若有版权异议请随时联系下架或替换。

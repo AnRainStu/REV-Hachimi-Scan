@@ -1,5 +1,5 @@
 > [!NOTE]
-> The owner of this repo built this entirely via vibe coding, and isn't quite sure what this Agent actually does. ¯\\\_(ツ)\_/¯
+> This is an experimental open-source project created by an individual developer with AI-assisted pair programming, exploring the limits of on-device computational photography, Camera2 low-level ISP tuning, and classical computer vision algorithms on Android. The project is in its early stages and carries notable technical debt; constructive feedback, issues, and pull requests are warmly welcomed.
 
 <div align="center">
 
@@ -7,16 +7,15 @@
 
 # HachiCam 🐾
 
-**A vibe-coded, fully local Android document scanner.**
+**A pure on-device Android document scanner focused on raw image quality and low-level computational photography.**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Specs: CC0 1.0](https://img.shields.io/badge/Specs-CC0%201.0-lightgrey.svg)](specs/LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android%2010%2B-green.svg)](https://developer.android.com)
 [![Engine](https://img.shields.io/badge/Engine-OpenCV%204.10%20%2B%20C%2B%2B17-orange.svg)](app/src/main/cpp)
 [![UI](https://img.shields.io/badge/UI-Jetpack%20Compose-purple.svg)](https://developer.android.com/jetpack/compose)
-[![Engineered with Antigravity](https://img.shields.io/badge/Engineered%20with-Antigravity-6C5CE7?logo=google&logoColor=white)](https://deepmind.google)
 
-*Zero ads, zero tracking, zero network permissions. 100% on-device processing.*
+*Zero ads, zero telemetry, zero network permissions. 100% on-device processing.*
 
 [English](README.md) | [简体中文](README_zh.md) | [Download Releases](https://github.com/eviau512/Hachimi-Scan/releases)
 
@@ -24,51 +23,67 @@
 
 ---
 
-## 🌟 Features
+## 💡 Design Rationale & Trade-offs
 
-### 1. Screen HDR & Burst Anti-Overexposure (SPEC_08)
-* **Dynamic EV Bracketing Pipeline**:
-  - Solves severe overexposure and saturation blowout when photographing luminous computer monitors, laptops, and tablets.
-  - Automatically captures a rapid three-frame exposure bracket (`EV 0` / `EV -2.0` / `EV 0`) upon steady detection, pulling clipped screen highlights back into the camera sensor's linear range.
-* **Tom Mertens Multi-Exposure Fusion**:
-  - Seamlessly fuses bracketed frames using multi-scale Laplacian/Gaussian pyramids weighted by well-exposedness, contrast, and saturation, completely preventing halo artifacts around bright screen borders.
-* **Subpixel Stabilization & Motion De-Ghosting**:
-  - Full-frame ORB feature detection + RANSAC 8-DoF homography alignment corrects physiological hand tremors.
-  - Strict motion de-ghosting threshold ($\Delta_{\text{diff}} \le 22$) filters out misaligned pixels, ensuring crisp, ghost-free typography.
-* **Hard Specular Glare Replacement**:
-  - Overexposed saturated patches (RGB > 238) on screens are replaced with sharp, unclipped details from underexposed frames.
+While numerous ready-made scanning components (such as ML Kit Document Scanner) exist on Android, HachiCam chose to build its own C++ OpenCV engine and Camera2 ISP pipeline from the ground up for several deliberate reasons:
 
-### 2. Document Enhancement Filters
+1. **Image Quality First & Raw Sensor Throughput**:
+   - Most turnkey scanning SDKs prioritize real-time performance on budget devices, enforcing 1080p viewfinder downsampling, heavy noise reduction smoothing, and aggressive lossy JPEG compression. This causes paper fiber details, fine document halftone dots, and light pencil strokes to blur or vanish.
+   - To achieve superior document archival quality, HachiCam directly controls Camera2 hardware ISP requests (disabling software video stabilization crop, enabling high-quality noise reduction and edge modes, and engaging hardware OIS), paired with a custom C++ subpixel super-resolution pipeline to exploit the full optical resolving power of the camera sensor.
+2. **100% Offline & De-Googled (Zero GMS Dependency)**:
+   - Proprietary SDKs typically rely on closed-source Google Play Services (GMS) dynamically downloaded to the host device.
+   - HachiCam **does not request the `INTERNET` permission** and carries zero Google Play dependencies, ensuring seamless operation on de-Googled custom ROMs (such as LineageOS, GrapheneOS, or CalyxOS) and offline environments.
+3. **Algorithmic Determinism & Explainability**:
+   - Rather than relying on blackbox generative neural networks that risk hallucinating or distorting alphanumeric characters, all operations are built on classical image processing foundations (Retinex illumination division, Sauvola adaptive binarization, ORB/RANSAC homography, and Mertens exposure pyramid fusion).
+
+---
+
+## 🌟 Key Features
+
+### 1. Camera & Computational Photography
+* **Hardware ISP Tuning**:
+  - Leverages Camera2Interop to inject high-quality capture parameters, ensuring hardware OIS and optimal tone mapping.
+* **50MP Multi-Frame Super-Resolution Burst (Experimental)**:
+  - Capitalizes on involuntary physiological hand tremor ($0.1 \sim 0.8\text{ px}$ subpixel displacement) across rapid frames, utilizing ORB + RANSAC homography to accumulate polyphase samples onto a $2\times$ canvas ($8160 \times 6144 \approx 50.1\text{MP}$), reconstructing high-frequency optical detail beyond single-frame Nyquist limits.
+* **Orientation Awareness & Dynamic UI Rotation**:
+  - Fully adaptive rotation across viewfinder controls, automatically normalizing physical pixel orientation and EXIF headers for convenient landscape shooting of wide banners and station signs.
+
+### 2. Edge Detection & Perspective Correction
+* **Text Saliency & Wide Aspect Ratio Support**:
+  - Integrates a Sobel gradient integral image to rapidly assess internal stroke energy density (Text Saliency), prioritizing text-bearing signs over empty, reflective glass doors in challenging environments.
+  - Accommodates wide aspect ratios up to $12:1$ for subway route signs, banners, and long receipts.
+* **Interactive Quad Cropping with 2.8x Loupe**:
+  - Floating crosshair magnifying glass displays during corner adjustments for pixel-accurate positioning.
+  - Quick aspect presets: A4, A3, 4:3, 16:9, 8:7, and freeform Custom, with automatic foreshortening recovery.
+
+### 3. Document Enhancement Filters
 * **Retinex Magic Color**:
-  - CIE-Lab color space illumination separation isolates the low-frequency L channel.
-  - Illumination division ($R = S / L \times 255$) and dynamic white balancing eliminate paper wrinkles and cast shadows while preserving colorful highlighter ink and official seals.
-* **Sauvola Adaptive Binarization (B&W Document)**：
-  - Accelerated via integral images to compute local dynamic thresholds, erasing background copy noise while maintaining ultra-fine text strokes.
+  - Isolates the L channel in CIE-Lab color space using low-frequency illumination division to neutralize cast shadows and paper creases, paired with dynamic white balancing to preserve colorful highlighter marks and official stamps.
+* **Sauvola Adaptive Binarization (B&W Document)**:
+  - Accelerated by double-precision integral images for $O(1)$ local dynamic thresholding, removing photocopy background gray without breaking delicate letterforms.
 * **Smooth Grayscale**:
-  - High dynamic range contrast stretching tailored for pencil sketches, receipts, and ID card photocopies.
+  - Balanced contrast stretching tailored for ID cards, pencil sketches, and invoices.
 
-### 3. Perspective Correction & Aspect Ratio Presets
-* **Bottom Aspect Ratio Banner**:
-  - Clean horizontal capsule banner positioned directly above filter controls, keeping the entire cropping canvas completely clear of obstructions.
-  - Instant presets: `A4`, `A3`, `4:3`, `16:9`, `8:7` (full modern sensor ratio and presentation slides), and freeform `Custom`.
-* **Foreshortening Recovery**:
-  - Automatically compensates for geometric compression caused by tilted angles, restoring the document's true physical aspect ratio.
+### 4. Privacy & Document Export
+* **100% On-Device**: All C++ NDK and OpenCV computations execute strictly locally.
+* **Zero Telemetry**: No user accounts, zero analytics or advertising SDKs.
+* **Vector PDF & Image Export**: Compiles clean multi-page PDFs using Android's native `PdfDocument` alongside batch JPEG exports.
 
-### 4. Edge Detection & Fine-Tuning
-* **LSD Structural Line Detection & Magnetic Snapping**:
-  - Intelligently recognizes physical paper boundaries with magnetic point and line snapping.
-* **2.8x Floating Loupe**:
-  - High-precision crosshair magnifying glass displays during handle adjustment for pixel-perfect corner alignment.
+---
 
-### 5. Interaction & Gestures
-* **Three-Stage Focal Zoom & Pan**:
-  - Double-tap focal zoom: `1.0x` $\to$ `2.5x` $\to$ `4.5x` $\to$ `1.0x`, centering on the tapped point.
-  - Smooth two-finger pinch-to-zoom (`1.0x ~ 5.0x`) with spring-damped viewport boundary snapping.
-* **Smooth 90° Rotation Transitions**.
+## ⚠️ Known Issues & Technical Debt
 
-### 6. Offline & Privacy-First
-* **100% On-Device Processing**: All image processing (C++ NDK + OpenCV) runs entirely locally.
-* **Zero Telemetry**: No user accounts, no network access permissions, no third-party tracking or analytics SDKs.
+This project was rapidly prototyped through human-AI pair programming. There are recognized architectural compromises and technical debt in the current codebase that are slated for refactoring:
+
+1. **File I/O Serialization Overhead**:
+   - The current multi-frame pipeline writes burst frames to temporary JPEGs on disk, decodes them back in C++ via `imread`, processes them, and writes them back. This introduces unnecessary disk wear and re-compression latency. We plan to transition to a zero-copy memory buffer pipeline using `ImageProxy` / `HardwareBuffer`.
+2. **Monolithic UI & ViewModel Components**:
+   - Files like `CameraScreen` and `CameraViewModel` currently manage multiple concurrent responsibilities (sensor monitoring, CameraX lifecycle, UI animations, and capture coordination). These will be decoupled into single-responsibility UseCases and Controllers.
+   - An in-memory StateFlow repository is currently used; a persistent SQLite/Room database is needed to protect unexported batches against process death.
+3. **JNI Interface Refinement**:
+   - Several JNI methods pass raw pointer handles (`jlong matAddr`) and flat arrays without comprehensive RAII memory management wrappers.
+
+We welcome constructive critiques, issue reports, and community pull requests.
 
 ---
 
@@ -81,51 +96,36 @@
 * JDK 17 or JDK 21
 * CMake 3.22.1+
 
-### Build via Command Line
+### Build from Command Line
 
 ```bash
 # Clone the repository
 git clone https://github.com/eviau512/Hachimi-Scan.git
 cd Hachimi-Scan
 
-# Build Hachimi Release APK (with auto-configured signing)
+# Build HachiCam Release APK
 ./gradlew assembleHachimiRelease
 
-# Or build Standard Release APK
+# Or build standard flavor Release APK
 ./gradlew assembleStandardRelease
 ```
 
-Generated APKs are located at `app/build/outputs/apk/hachimi/release/`.
+Generated APKs are located in `app/build/outputs/apk/hachimi/release/`.
 
 ---
 
-## 📄 License & Copyright Notice
+## 📄 Technical Specifications
 
-This project utilizes a tiered licensing policy:
-
-* **Source Code**: Licensed under the **[GNU General Public License v3 (GPLv3)](LICENSE)**, ensuring open and free access to all algorithms and code.
-* **Technical Specifications (`specs/`)**: Dedicated to the public domain under **[Creative Commons Zero v1.0 (CC0 1.0)](specs/LICENSE)** for open academic and clean-room reference.
-* **Application Icon & Visual Artwork**:
-  - The application icon and character illustrations are derived from Chinese internet community fan comics (originating from "LLM-chan" / Dafeiyu comics culture). The project maintainer does not hold exclusive or original copyright over these visual assets.
-  - As original upstream licensing policies and ShareAlike terms are not formally defined, **this project claims no proprietary copyright over these artistic depictions**; assets are used solely for open-source community non-commercial demonstration.
-  - If original artists have inquiries or requests regarding visual asset usage, please open an Issue and we will promptly replace or remove them.
-  - ⚠️ **Notice for Downstream Distributors**: If redistributing, modifying, or commercializing this project, please exercise caution regarding visual asset rights; it is strongly recommended to replace the launcher icons and illustrations with your own proprietary artwork.
+All core algorithms are documented with detailed mathematical models under [`specs/`](specs/) (dedicated to public domain under CC0 1.0):
+* [`SPEC_00_ARCHITECTURE_AND_TECH_STACK.md`](specs/SPEC_00_ARCHITECTURE_AND_TECH_STACK.md): System architecture, pipelines, and tech stack overview
+* [`SPEC_01_RETINEX_MAGIC_COLOR_ENGINE.md`](specs/SPEC_01_RETINEX_MAGIC_COLOR_ENGINE.md): Retinex CIE-Lab illumination division model
+* [`SPEC_02_ADAPTIVE_BINARIZATION_ENGINE.md`](specs/SPEC_02_ADAPTIVE_BINARIZATION_ENGINE.md): Sauvola integral image adaptive binarization
+* [`SPEC_04_BURST_FUSION_ENGINE.md`](specs/SPEC_04_BURST_FUSION_ENGINE.md): Multi-frame alignment and 50MP subpixel super-resolution
+* [`SPEC_15_METRO_SIGN_AND_TEXT_SALIENCY_DETECTION.md`](specs/SPEC_15_METRO_SIGN_AND_TEXT_SALIENCY_DETECTION.md): Wide-aspect detection and text saliency scoring
 
 ---
 
-## 🤖 Acknowledgments
+## 📄 License
 
-This project was developed through collaborative vibe coding with **[Google Antigravity](https://deepmind.google)**, covering the entire native C++ NDK image processing pipeline and Jetpack Compose modern UI.
-
----
-
-## ⚖️ Disclaimer & Trademark Notice
-
-1. **Regarding "Hachimi"**:
-   - "Hachimi" is a popular internet community meme. Within the Chinese AI/LLM developer community, it is also widely used as an affectionate nickname for Google's **Gemini**.
-   - The project name `HachiCam` serves both as a cultural tribute and as a playful nod to the software being vibe-coded with Google Antigravity / Gemini.
-   - **The developers do not own, nor do they claim, any exclusive trademark or proprietary rights over the word "Hachimi".**
-
-2. **Non-Affiliation & Trademarks**:
-   - This project is an independent free and open-source utility and is not affiliated with, endorsed by, or sponsored by Cygames or any other entities.
-   - All product names, trademarks, and registered trademarks mentioned herein are the property of their respective owners.
+* **Source Code**: Licensed under the **[GNU General Public License v3 (GPLv3)](LICENSE)**.
+* **Specifications**: Dedicated to the public domain under **[Creative Commons Zero v1.0 (CC0 1.0)](specs/LICENSE)**.
