@@ -23,21 +23,6 @@
 
 ---
 
-## 💡 设计初衷与技术取舍 (Design Rationale)
-
-在 Android 生态中，已有不少开箱即用的扫码组件（如 ML Kit Document Scanner）与文档扫描应用，但本项目之所以选择从底层自建 OpenCV C++ 引擎与 Camera2 ISP 管线，源于以下核心考虑：
-
-1. **画质优先与原始传感器吞吐**：
-   - 绝大多数通用扫描 SDK 优先考虑低算力设备上的实时性，通常对取景流强制降采样至 1080p，并伴随较重的降噪涂抹与有损压缩，导致纸张细微纤维、图表浅色网点与细笔画断裂丢失。
-   - 为了追求更高的文档归档画质，本项目接管底层 Camera2 硬件 ISP（关闭软防抖画幅裁剪、开启高品质降噪与边缘增强、启用硬件光学防抖 OIS），并在 C++ 层实现了基于手持微晃动的亚像素超分辨率重构，尽可能发挥手机摄像头的物理光学解析力。
-2. **纯粹离线与零 GMS 依赖 (De-Googled)**：
-   - 常见商业 SDK 往往依赖闭源的 Google Play Services (GMS) 动态分发。
-   - HachiCam **不申请 `INTERNET` 联网权限**，底层无任何 Google Play 服务依赖，原生适配 LineageOS、GrapheneOS 等开源无 GMS 定制系统，以及无 Google 服务的网络环境。
-3. **算法确定性与数学可解释性**：
-   - 不依赖端侧不可控的生成式 AI（避免字符被“脑补”或篡改），全部基于经典图像处理理论（Retinex 照度分解、Sauvola 局部二值化、ORB/RANSAC 几何对齐、Mertens 多曝光金字塔融合）实现透明、可审计的文档复原。
-
----
-
 ## 🌟 核心功能
 
 ### 1. 相机与计算摄影 (Camera & Computational Photography)

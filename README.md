@@ -23,21 +23,6 @@
 
 ---
 
-## 💡 Design Rationale & Trade-offs
-
-While numerous ready-made scanning components (such as ML Kit Document Scanner) exist on Android, HachiCam chose to build its own C++ OpenCV engine and Camera2 ISP pipeline from the ground up for several deliberate reasons:
-
-1. **Image Quality First & Raw Sensor Throughput**:
-   - Most turnkey scanning SDKs prioritize real-time performance on budget devices, enforcing 1080p viewfinder downsampling, heavy noise reduction smoothing, and aggressive lossy JPEG compression. This causes paper fiber details, fine document halftone dots, and light pencil strokes to blur or vanish.
-   - To achieve superior document archival quality, HachiCam directly controls Camera2 hardware ISP requests (disabling software video stabilization crop, enabling high-quality noise reduction and edge modes, and engaging hardware OIS), paired with a custom C++ subpixel super-resolution pipeline to exploit the full optical resolving power of the camera sensor.
-2. **100% Offline & De-Googled (Zero GMS Dependency)**:
-   - Proprietary SDKs typically rely on closed-source Google Play Services (GMS) dynamically downloaded to the host device.
-   - HachiCam **does not request the `INTERNET` permission** and carries zero Google Play dependencies, ensuring seamless operation on de-Googled custom ROMs (such as LineageOS, GrapheneOS, or CalyxOS) and offline environments.
-3. **Algorithmic Determinism & Explainability**:
-   - Rather than relying on blackbox generative neural networks that risk hallucinating or distorting alphanumeric characters, all operations are built on classical image processing foundations (Retinex illumination division, Sauvola adaptive binarization, ORB/RANSAC homography, and Mertens exposure pyramid fusion).
-
----
-
 ## 🌟 Key Features
 
 ### 1. Camera & Computational Photography
