@@ -9,12 +9,12 @@
 extern "C" {
 
 JNIEXPORT jfloatArray JNICALL
-Java_com_scanner_app_engine_NativeEdgeDetector_nativeDetectDocument(JNIEnv* env, jobject /* this */, jlong matAddr, jboolean curvedMode) {
+Java_com_scanner_app_engine_NativeEdgeDetector_nativeDetectDocument(JNIEnv* env, jobject /* this */, jlong matAddr, jboolean curvedMode, jfloat touchX, jfloat touchY) {
     cv::Mat* grayFrame = reinterpret_cast<cv::Mat*>(matAddr);
     if (!grayFrame) return env->NewFloatArray(0);
 
     EdgeDetector detector;
-    DetectionResult result = detector.detectDocument(*grayFrame, curvedMode);
+    DetectionResult result = detector.detectDocument(*grayFrame, curvedMode, touchX, touchY);
 
     std::vector<float> outData;
     outData.push_back(result.found ? 1.0f : 0.0f);
@@ -109,7 +109,7 @@ Java_com_scanner_app_engine_NativePerspective_nativeApplyFilter(JNIEnv* /* env *
 }
 
 JNIEXPORT jlong JNICALL
-Java_com_scanner_app_engine_NativeBurstFusion_nativeFuseBurstFrames(JNIEnv* env, jobject /* this */, jlongArray matAddrs, jboolean removeGlare, jboolean isScreenMode) {
+Java_com_scanner_app_engine_NativeBurstFusion_nativeFuseBurstFrames(JNIEnv* env, jobject /* this */, jlongArray matAddrs, jboolean removeGlare, jboolean isScreenMode, jboolean superResolution) {
     if (!matAddrs) return 0;
 
     jsize len = env->GetArrayLength(matAddrs);
@@ -130,7 +130,7 @@ Java_com_scanner_app_engine_NativeBurstFusion_nativeFuseBurstFrames(JNIEnv* env,
     if (frames.empty()) return 0;
 
     BurstFusionEngine engine;
-    cv::Mat fused = engine.fuseBurstFrames(frames, removeGlare, isScreenMode);
+    cv::Mat fused = engine.fuseBurstFrames(frames, removeGlare, isScreenMode, superResolution);
 
     cv::Mat* result = new cv::Mat(fused);
     return reinterpret_cast<jlong>(result);

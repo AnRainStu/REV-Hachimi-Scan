@@ -67,6 +67,9 @@
     <string name="custom_ratio_hint">输入宽高比</string>
     <string name="placeholder_input">待输入</string>
     <string name="experimental_features">实验性功能</string>
+    <string name="burst_super_res_title">多帧超分连拍 (50MP Super-Res)</string>
+    <string name="burst_super_res_summary">利用手部微晃动亚像素融合超分至 50MP，恢复真实光学细节并消除反光</string>
+    <string name="fusing_super_res">正在进行 50MP 多帧超分融合&#8230;</string>
     <string name="full_hdr_title">Full HDR (底层跨品牌高动态范围)</string>
     <string name="full_hdr_summary">接管底层 Camera2 连拍与局部色调映射管线 (测试中)</string>
     <string name="full_hdr_warning_title">⚠️ 实验性功能警告</string>

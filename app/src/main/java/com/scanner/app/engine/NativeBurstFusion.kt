@@ -18,19 +18,21 @@ class NativeBurstFusion {
     fun fuseBurstFrames(
         burstFrames: List<Mat>,
         removeGlare: Boolean = true,
-        isScreenMode: Boolean = true
+        isScreenMode: Boolean = true,
+        superResolution: Boolean = false
     ): Mat {
         if (burstFrames.isEmpty()) return Mat()
-        if (burstFrames.size == 1) return burstFrames[0].clone()
+        if (burstFrames.size == 1 && !superResolution) return burstFrames[0].clone()
 
         val addrs = burstFrames.map { it.nativeObjAddr }.toLongArray()
-        val resultAddr = nativeFuseBurstFrames(addrs, removeGlare, isScreenMode)
+        val resultAddr = nativeFuseBurstFrames(addrs, removeGlare, isScreenMode, superResolution)
         return Mat(resultAddr)
     }
 
     private external fun nativeFuseBurstFrames(
         matAddrs: LongArray,
         removeGlare: Boolean,
-        isScreenMode: Boolean
+        isScreenMode: Boolean,
+        superResolution: Boolean
     ): Long
 }

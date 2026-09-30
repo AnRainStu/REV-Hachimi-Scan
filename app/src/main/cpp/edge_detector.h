@@ -13,8 +13,8 @@ struct DetectionResult {
 
 class EdgeDetector {
 public:
-    // 快速端侧边缘检测 (抗杂乱桌面、抗复杂光照、防止沙漏错乱)
-    DetectionResult detectDocument(const cv::Mat& grayFrame, bool curvedMode = false);
+    // 快速端侧边缘检测 (抗杂乱桌面、抗复杂光照、MS Lens 文本/笔画内部能量打分，支持长条标牌)
+    DetectionResult detectDocument(const cv::Mat& grayFrame, bool curvedMode = false, float touchX = -1.0f, float touchY = -1.0f);
 
     // 质心极角排序：彻底根治旋转30°~60°时的角点对角翻转bug
     static std::vector<cv::Point2f> sortCorners(const std::vector<cv::Point2f>& points);

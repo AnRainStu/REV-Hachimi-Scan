@@ -15,6 +15,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.HdrOn
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
@@ -64,6 +65,9 @@ fun SettingsScreen(
     }
 
     var showLangDialog by remember { mutableStateOf(false) }
+    var isBurstSuperResEnabled by remember {
+        mutableStateOf(prefs.getBoolean("burst_super_res_enabled", false))
+    }
     var isFullHdrEnabled by remember {
         mutableStateOf(prefs.getBoolean("full_hdr_enabled", false))
     }
@@ -156,6 +160,40 @@ fun SettingsScreen(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = stringResource(R.string.burst_super_res_title),
+                                fontWeight = FontWeight.Medium
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = stringResource(R.string.burst_super_res_summary),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        },
+                        leadingContent = {
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = if (isBurstSuperResEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        },
+                        trailingContent = {
+                            Switch(
+                                checked = isBurstSuperResEnabled,
+                                onCheckedChange = { checked ->
+                                    isBurstSuperResEnabled = checked
+                                    prefs.edit().putBoolean("burst_super_res_enabled", checked).apply()
+                                }
+                            )
+                        }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                    )
                     ListItem(
                         headlineContent = {
                             Text(

@@ -63,6 +63,13 @@ import com.scanner.app.engine.NativeEdgeDetector
 import com.scanner.app.ui.theme.PrismCyan
 import com.scanner.app.ui.theme.SteadyEmerald
 import com.scanner.app.ui.theme.SteadyAmber
+import android.content.res.Configuration
+import android.view.OrientationEventListener
+import android.view.Surface
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import java.util.concurrent.Executors
 
 @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
@@ -73,13 +80,55 @@ fun CameraScreen(
     onNavigateToSettings: () -> Unit,
     viewModel: CameraViewModel = viewModel()
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     val detectedQuad by viewModel.detectedQuad.collectAsState()
     val curvedModeEnabled by viewModel.curvedModeEnabled.collectAsState()
-    val burstModeEnabled by viewModel.burstModeEnabled.collectAsState()
+    val burstSuperResEnabled by viewModel.burstSuperResEnabled.collectAsState()
     val isStable by viewModel.isStable.collectAsState()
     val isCapturing by viewModel.isCapturing.collectAsState()
     val pageCount by viewModel.pageCount.collectAsState()
     val capturedPages by viewModel.capturedPages.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.updateSettings(context)
+    }
+
+    var deviceRotationDegrees by remember { mutableFloatStateOf(0f) }
+    DisposableEffect(context) {
+        val orientationListener = object : OrientationEventListener(context) {
+            override fun onOrientationChanged(orientation: Int) {
+                if (orientation == ORIENTATION_UNKNOWN) return
+                val rotation = when (orientation) {
+                    in 45 until 135 -> Surface.ROTATION_270
+                    in 135 until 225 -> Surface.ROTATION_180
+                    in 225 until 315 -> Surface.ROTATION_90
+                    else -> Surface.ROTATION_0
+                }
+                viewModel.imageCapture?.targetRotation = rotation
+                deviceRotationDegrees = when (rotation) {
+                    Surface.ROTATION_0 -> 0f
+                    Surface.ROTATION_90 -> 270f
+                    Surface.ROTATION_180 -> 180f
+                    Surface.ROTATION_270 -> 90f
+                    else -> 0f
+                }
+            }
+        }
+        if (orientationListener.canDetectOrientation()) {
+            orientationListener.enable()
+        }
+        onDispose {
+            orientationListener.disable()
+        }
+    }
+
+    val uiRotation by animateFloatAsState(
+        targetValue = deviceRotationDegrees,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing),
+        label = "uiRotation"
+    )
 
     val lastPage = capturedPages.lastOrNull()
     val lastThumbnailBitmap = remember(lastPage?.id, lastPage?.thumbnailPath, lastPage?.imagePath) {
@@ -99,9 +148,6 @@ fun CameraScreen(
             } else null
         } else null
     }
-
-    val context = LocalContext.current
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -125,9 +171,9 @@ fun CameraScreen(
         label = "pulseAlpha"
     )
 
-    // Shutter outer ring color based on stability & burst mode
+    // Shutter outer ring color based on stability & burst super-res mode
     val targetRingColor = when {
-        burstModeEnabled -> PrismCyan
+        burstSuperResEnabled -> PrismCyan
         isStable -> SteadyEmerald
         else -> Color.White.copy(alpha = 0.45f)
     }
@@ -137,7 +183,7 @@ fun CameraScreen(
         label = "stabilityRingColor"
     )
     val ringWidth by animateDpAsState(
-        targetValue = if (isStable || burstModeEnabled) 4.dp else 2.5.dp,
+        targetValue = if (isStable || burstSuperResEnabled) 4.dp else 2.5.dp,
         animationSpec = tween(durationMillis = 250),
         label = "ringWidth"
     )
@@ -164,6 +210,14 @@ fun CameraScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    viewModel.setTouchPoint(
+                        offset.x / size.width.toFloat(),
+                        offset.y / size.height.toFloat()
+                    )
+                }
+            }
     ) {
         // 1. Fullscreen Viewfinder (Edge-to-Edge)
         AndroidView(
@@ -344,6 +398,7 @@ fun CameraScreen(
                     .clip(CircleShape)
                     .background(torchBg)
                     .border(1.2.dp, torchBorder, CircleShape)
+                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Icon(
                     imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
@@ -360,6 +415,7 @@ fun CameraScreen(
                     .background(Color(0x990A0F1D))
                     .border(1.dp, Color(0x2AFFFFFF), RoundedCornerShape(24.dp))
                     .padding(horizontal = 14.dp, vertical = 7.dp)
+                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -391,6 +447,7 @@ fun CameraScreen(
                     .clip(CircleShape)
                     .background(Color(0x990A0F1D))
                     .border(1.dp, Color(0x2AFFFFFF), CircleShape)
+                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -408,21 +465,22 @@ fun CameraScreen(
                     .align(Alignment.Center)
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xE60F172A))
-                    .border(1.dp, if (burstModeEnabled) PrismCyan.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(20.dp))
+                    .border(1.dp, if (burstSuperResEnabled) PrismCyan.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(20.dp))
                     .padding(horizontal = 32.dp, vertical = 24.dp)
+                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
                     CircularProgressIndicator(
-                        color = if (burstModeEnabled) PrismCyan else SteadyEmerald,
+                        color = if (burstSuperResEnabled) PrismCyan else SteadyEmerald,
                         strokeWidth = 3.5.dp,
                         modifier = Modifier.size(44.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = if (burstModeEnabled) stringResource(R.string.fusing_burst) else stringResource(R.string.processing),
+                        text = if (burstSuperResEnabled) stringResource(R.string.fusing_super_res) else stringResource(R.string.processing),
                         color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
@@ -441,43 +499,13 @@ fun CameraScreen(
                 .padding(bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Secondary Controls: Mode Toggle Capsules
+            // Secondary Controls: Mode Toggle Capsules (Curved Dewarp)
             Row(
                 modifier = Modifier
                     .padding(horizontal = 24.dp, vertical = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Burst Mode Capsule
-                val burstBg = if (burstModeEnabled) PrismCyan.copy(alpha = 0.22f) else Color(0x770A0F1D)
-                val burstBorder = if (burstModeEnabled) PrismCyan else Color(0x2EFFFFFF)
-                val burstTextColor = if (burstModeEnabled) PrismCyan else Color(0xFFE2E8F0)
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(burstBg)
-                        .border(1.2.dp, burstBorder, RoundedCornerShape(24.dp))
-                        .clickable { viewModel.toggleBurstMode() }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp),
-                            tint = if (burstModeEnabled) PrismCyan else Color(0xFF94A3B8)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (burstModeEnabled) stringResource(R.string.burst_on) else stringResource(R.string.burst_off),
-                            fontSize = 12.sp,
-                            fontWeight = if (burstModeEnabled) FontWeight.Bold else FontWeight.Medium,
-                            color = burstTextColor
-                        )
-                    }
-                }
-
                 // Curved Dewarp Mode Capsule
                 val curveBg = if (curvedModeEnabled) SteadyEmerald.copy(alpha = 0.22f) else Color(0x770A0F1D)
                 val curveBorder = if (curvedModeEnabled) SteadyEmerald else Color(0x2EFFFFFF)
@@ -490,6 +518,7 @@ fun CameraScreen(
                         .border(1.2.dp, curveBorder, RoundedCornerShape(24.dp))
                         .clickable { viewModel.toggleCurvedMode() }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
+                        .graphicsLayer { rotationZ = uiRotation }
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -530,7 +559,8 @@ fun CameraScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color(0x990A0F1D))
                             .border(1.5.dp, Color(0x44FFFFFF), RoundedCornerShape(16.dp))
-                            .clickable { galleryLauncher.launch("image/*") },
+                            .clickable { galleryLauncher.launch("image/*") }
+                            .graphicsLayer { rotationZ = uiRotation },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -554,11 +584,11 @@ fun CameraScreen(
                     if (isCapturing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(54.dp),
-                            color = if (burstModeEnabled) PrismCyan else SteadyEmerald,
+                            color = if (burstSuperResEnabled) PrismCyan else SteadyEmerald,
                             strokeWidth = 3.5.dp
                         )
                     } else {
-                        val innerColor = if (burstModeEnabled) PrismCyan else Color.White
+                        val innerColor = if (burstSuperResEnabled) PrismCyan else Color.White
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -574,12 +604,14 @@ fun CameraScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            if (burstModeEnabled) {
+                            if (burstSuperResEnabled) {
                                 Icon(
                                     imageVector = Icons.Default.AutoAwesome,
                                     contentDescription = stringResource(R.string.capture),
                                     tint = Color(0xFF0F172A),
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .graphicsLayer { rotationZ = uiRotation }
                                 )
                             }
                         }
@@ -598,7 +630,8 @@ fun CameraScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Color(0x990A0F1D))
                                 .border(1.5.dp, Color(0x44FFFFFF), RoundedCornerShape(16.dp))
-                                .clickable { onNavigateToReview() },
+                                .clickable { onNavigateToReview() }
+                                .graphicsLayer { rotationZ = uiRotation },
                             contentAlignment = Alignment.Center
                         ) {
                             if (lastThumbnailBitmap != null) {

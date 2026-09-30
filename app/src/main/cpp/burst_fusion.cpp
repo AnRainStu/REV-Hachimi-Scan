@@ -131,14 +131,148 @@ float BurstFusionEngine::estimateHighlightAdaptationGain(
 // ============================================================================
 // 真正过曝饱和嫁接与高光微细节保真 HDR 融合总入口 (SPEC_12)
 // ============================================================================
-cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFrames, bool removeGlare, bool isScreenMode) {
+// ============================================================================
+// 真正过曝饱和嫁接与高光微细节保真 HDR 融合 / 1分4 50MP 亚像素超分 (SPEC_12 & 50MP Super-Res)
+// ============================================================================
+cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFrames, bool removeGlare, bool isScreenMode, bool superResolution) {
     if (burstFrames.empty()) return cv::Mat();
-    if (burstFrames.size() == 1) return burstFrames[0].clone();
+    if (burstFrames.size() == 1 && !superResolution) return burstFrames[0].clone();
 
     const cv::Mat& baseFrame = burstFrames[0];
     int rows = baseFrame.rows;
     int cols = baseFrame.cols;
 
+    // ------------------------------------------------------------------------
+    // 分支 A: 1分4 50MP 亚像素多帧超分重建 (Super-Resolution Zoom Fusion)
+    // ------------------------------------------------------------------------
+    if (superResolution) {
+        int superRows = rows * 2;
+        int superCols = cols * 2;
+
+        // 1. 基准帧双三次高质量插值升采样至 2x (8160 x 6144) 作为高分辨率初始骨架
+        cv::Mat baseSuper;
+        cv::resize(baseFrame, baseSuper, cv::Size(superCols, superRows), 0, 0, cv::INTER_CUBIC);
+
+        cv::Mat accum(superRows, superCols, CV_32FC3);
+        baseSuper.convertTo(accum, CV_32FC3);
+
+        cv::Mat weights(superRows, superCols, CV_32FC1, cv::Scalar(1.0f));
+
+        cv::Mat validMaskSrc = cv::Mat::ones(baseFrame.size(), CV_8UC1) * 255;
+
+        // 2. 遍历辅帧，计算单应性并换算到 2x 亚像素坐标系进行多相核累加
+        for (size_t k = 1; k < burstFrames.size(); ++k) {
+            const cv::Mat& candFrame = burstFrames[k];
+            cv::Mat candWarped1x, H;
+            if (!alignFrameHomography(candFrame, baseFrame, candWarped1x, H)) {
+                continue;
+            }
+
+            // 构造 2x 亚像素单应性矩阵: H_2x = S_2 * H * S_0.5
+            cv::Mat H2x = H.clone();
+            H2x.at<double>(0, 2) *= 2.0;
+            H2x.at<double>(1, 2) *= 2.0;
+            H2x.at<double>(2, 0) *= 0.5;
+            H2x.at<double>(2, 1) *= 0.5;
+
+            // 辅帧直接通过亚像素单应性矩阵投射至 2x 高清画布
+            cv::Mat candWarpedSuper;
+            cv::warpPerspective(candFrame, candWarpedSuper, H2x, cv::Size(superCols, superRows), cv::INTER_CUBIC, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+
+            cv::Mat validMaskSuper;
+            cv::warpPerspective(validMaskSrc, validMaskSuper, H2x, cv::Size(superCols, superRows), cv::INTER_NEAREST, cv::BORDER_CONSTANT, cv::Scalar(0));
+
+            // 双边时域距离加权累加 (抑制运动模糊鬼影，融合手部微晃动亚像素光学高频)
+            float alpha = estimateHighlightAdaptationGain(baseSuper, candWarpedSuper, validMaskSuper);
+
+            #pragma omp parallel for
+            for (int y = 0; y < superRows; ++y) {
+                const cv::Vec3b* pBase = baseSuper.ptr<cv::Vec3b>(y);
+                const cv::Vec3b* pCand = candWarpedSuper.ptr<cv::Vec3b>(y);
+                const uchar* pValid = validMaskSuper.ptr<uchar>(y);
+                cv::Vec3f* pAccum = accum.ptr<cv::Vec3f>(y);
+                float* pWeight = weights.ptr<float>(y);
+
+                for (int x = 0; x < superCols; ++x) {
+                    if (pValid[x] == 0) continue;
+
+                    const cv::Vec3b& b0 = pBase[x];
+                    const cv::Vec3b& bk = pCand[x];
+
+                    float y0 = 0.114f * b0[0] + 0.587f * b0[1] + 0.299f * b0[2];
+                    float yk = 0.114f * bk[0] + 0.587f * bk[1] + 0.299f * bk[2];
+
+                    // 时域光度差高斯核权重 (sigma = 18.0)
+                    float diff = (y0 - yk);
+                    float w = std::exp(-(diff * diff) / (2.0f * 18.0f * 18.0f));
+
+                    if (w > 0.04f) {
+                        pAccum[x][0] += w * static_cast<float>(bk[0]);
+                        pAccum[x][1] += w * static_cast<float>(bk[1]);
+                        pAccum[x][2] += w * static_cast<float>(bk[2]);
+                        pWeight[x] += w;
+                    }
+                }
+            }
+        }
+
+        // 3. 归一化融合结果
+        cv::Mat superResult(superRows, superCols, CV_8UC3);
+        for (int y = 0; y < superRows; ++y) {
+            const cv::Vec3f* pAccum = accum.ptr<cv::Vec3f>(y);
+            const float* pWeight = weights.ptr<float>(y);
+            cv::Vec3b* pDst = superResult.ptr<cv::Vec3b>(y);
+
+            for (int x = 0; x < superCols; ++x) {
+                float invW = 1.0f / std::max(pWeight[x], 0.001f);
+                pDst[x][0] = cv::saturate_cast<uchar>(pAccum[x][0] * invW);
+                pDst[x][1] = cv::saturate_cast<uchar>(pAccum[x][1] * invW);
+                pDst[x][2] = cv::saturate_cast<uchar>(pAccum[x][2] * invW);
+            }
+        }
+
+        // 4. 自适应微反差质感合成 (SPEC_13 §2.3) 针对 50MP 优化
+        cv::Mat Y_mat(superRows, superCols, CV_32FC1);
+        for (int y = 0; y < superRows; ++y) {
+            const cv::Vec3b* pDst = superResult.ptr<cv::Vec3b>(y);
+            float* pY = Y_mat.ptr<float>(y);
+            for (int x = 0; x < superCols; ++x) {
+                const cv::Vec3b& px = pDst[x];
+                pY[x] = 0.114f * px[0] + 0.587f * px[1] + 0.299f * px[2];
+            }
+        }
+
+        cv::Mat Y_blur;
+        cv::GaussianBlur(Y_mat, Y_blur, cv::Size(5, 5), 1.5);
+
+        const float tau = 2.0f;
+        const float beta = 0.65f;
+
+        for (int y = 0; y < superRows; ++y) {
+            const float* pY = Y_mat.ptr<float>(y);
+            const float* pYBlur = Y_blur.ptr<float>(y);
+            cv::Vec3b* pDst = superResult.ptr<cv::Vec3b>(y);
+
+            for (int x = 0; x < superCols; ++x) {
+                float D = pY[x] - pYBlur[x];
+                float absD = std::abs(D);
+                if (absD > tau) {
+                    float sign = (D > 0.0f) ? 1.0f : -1.0f;
+                    float deltaY = sign * std::min((absD - tau) * beta, 18.0f);
+                    cv::Vec3b& px = pDst[x];
+                    px[0] = cv::saturate_cast<uchar>(static_cast<float>(px[0]) + deltaY);
+                    px[1] = cv::saturate_cast<uchar>(static_cast<float>(px[1]) + deltaY);
+                    px[2] = cv::saturate_cast<uchar>(static_cast<float>(px[2]) + deltaY);
+                }
+            }
+        }
+
+        return superResult;
+    }
+
+    // ------------------------------------------------------------------------
+    // 分支 B: 经典基准锁定过曝饱和嫁接 HDR 融合 (SPEC_12)
+    // ------------------------------------------------------------------------
     cv::Mat result = baseFrame.clone();
 
     // 对辅助帧逐一执行单应性粗对齐与高光单向嫁接 (SPEC_12)
@@ -158,7 +292,6 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
         float alpha = estimateHighlightAdaptationGain(baseFrame, candWarped, validMask);
 
         // 遍历所有像素，执行真正物理过曝平滑饱和嫁接 (SPEC_12 §2.1 & §2.3)
-        // 彻底杜绝 8位 Lab 转换量化损失，直接在 BGR 通道进行保真自适应混合
         for (int y = 0; y < rows; ++y) {
             const cv::Vec3b* pBase = baseFrame.ptr<cv::Vec3b>(y);
             const cv::Vec3b* pCandWarped = candWarped.ptr<cv::Vec3b>(y);
@@ -171,14 +304,10 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
                 const cv::Vec3b& b0 = pBase[x];
                 float y0 = 0.114f * static_cast<float>(b0[0]) + 0.587f * static_cast<float>(b0[1]) + 0.299f * static_cast<float>(b0[2]);
 
-                // 绝对基准帧保护区 (SPEC_12 §2.1):
-                // 覆盖 99% 以上画面 (阴影、中间调、树木、建筑、室内白墙、门牌号码、打印文档等)
-                // 100% 严格锁定基准帧像素，严禁任何辅助帧像素混合！
                 if (y0 < 242.0f) {
                     continue;
                 }
 
-                // 过曝平滑过渡区 [242, 252]: 三次 Hermite 样条 (Smoothstep) 保证一阶连续导数
                 float u = std::clamp((y0 - 242.0f) / 10.0f, 0.0f, 1.0f);
                 float m = 3.0f * u * u - 2.0f * u * u * u;
 
@@ -193,7 +322,6 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
     }
 
     // 阶段二：电影级 S-Curve 暗部黑电平压制 (SPEC_13 §2.2)
-    // 对深暗阴影与夜空区 (Y <= 28.0)，平滑压低暗电平，沉降夜空散粒噪点，保持色彩比例守恒
     for (int y = 0; y < rows; ++y) {
         cv::Vec3b* pDst = result.ptr<cv::Vec3b>(y);
         for (int x = 0; x < cols; ++x) {
@@ -211,7 +339,6 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
     }
 
     // 阶段三：自适应保边微反差与质感合成 (SPEC_13 §2.3)
-    // 提升树叶、砖缝、文字的微小反差细节，带死区控制（Coring）杜绝平坦区噪点放大
     cv::Mat Y_mat(rows, cols, CV_32FC1);
     for (int y = 0; y < rows; ++y) {
         const cv::Vec3b* pDst = result.ptr<cv::Vec3b>(y);

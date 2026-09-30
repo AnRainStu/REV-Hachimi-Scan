@@ -25,6 +25,8 @@ class FrameAnalyzer(
     private val recentQuads = ArrayDeque<FrameQuadRecord>(5)
     private var stableSinceMs: Long = 0L
 
+    var touchPoint: android.graphics.PointF? = null
+
     fun resetStability() {
         recentQuads.clear()
         stableSinceMs = 0L
@@ -65,7 +67,10 @@ class FrameAnalyzer(
                 grayMat.copyTo(rotatedMat)
             }
 
-            val result = detector.detectDocument(rotatedMat, curvedMode)
+            val tp = touchPoint
+            val touchX = tp?.x ?: -1.0f
+            val touchY = tp?.y ?: -1.0f
+            val result = detector.detectDocument(rotatedMat, curvedMode, touchX, touchY)
             val now = System.currentTimeMillis()
             val frameW = rotatedMat.cols()
             val frameH = rotatedMat.rows()

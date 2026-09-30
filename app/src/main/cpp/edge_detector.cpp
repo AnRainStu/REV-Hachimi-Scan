@@ -3,7 +3,7 @@
 #include <numeric>
 #include <cmath>
 
-DetectionResult EdgeDetector::detectDocument(const cv::Mat& grayFrame, bool curvedMode) {
+DetectionResult EdgeDetector::detectDocument(const cv::Mat& grayFrame, bool curvedMode, float touchX, float touchY) {
     DetectionResult result;
     result.found = false;
     result.isCurved = curvedMode;
@@ -19,6 +19,17 @@ DetectionResult EdgeDetector::detectDocument(const cv::Mat& grayFrame, bool curv
     } else {
         smallFrame = grayFrame;
     }
+
+    // 计算高频笔画/文本能量密度图 (Sobel 梯度图) 与积分图，用于 MS Lens 风格的图文显著度判定
+    cv::Mat gradX, gradY;
+    cv::Sobel(smallFrame, gradX, CV_16S, 1, 0, 3);
+    cv::Sobel(smallFrame, gradY, CV_16S, 0, 1, 3);
+    cv::convertScaleAbs(gradX, gradX);
+    cv::convertScaleAbs(gradY, gradY);
+    cv::Mat gradMag;
+    cv::addWeighted(gradX, 0.5, gradY, 0.5, 0, gradMag);
+    cv::Mat intGrad;
+    cv::integral(gradMag, intGrad, CV_64F);
 
     // 2. 对比度受限自适应直方图均衡化 (CLAHE) - 彻底解决白墙+浅色告示弱对比度问题 (SPEC_01 §2.2)
     cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(2.0, cv::Size(8, 8));
@@ -49,8 +60,8 @@ DetectionResult EdgeDetector::detectDocument(const cv::Mat& grayFrame, bool curv
     });
 
     double frameArea = smallFrame.cols * smallFrame.rows;
-    // SPEC_01 §2.2: 放宽最小面积门限至 0.008 * frameArea (0.8% of frame)，捕获远距离告示牌
-    double minArea = 0.008 * frameArea;
+    // SPEC_01 §2.2: 放宽最小面积门限至 0.005 * frameArea (0.5% of frame)，捕获远距离告示牌
+    double minArea = 0.005 * frameArea;
     double maxArea = 0.95 * frameArea; // 排除摄像头最外边框
 
     int marginX = static_cast<int>(smallFrame.cols * 0.015);
@@ -119,17 +130,17 @@ DetectionResult EdgeDetector::detectDocument(const cv::Mat& grayFrame, bool curv
             }
 
             if (validAngles) {
-                // 长宽比校验 (防止细长死线误检)
+                // 长宽比校验 (放宽至 12.0f，支持地铁站牌、条幅、横幅与长收据)
                 cv::RotatedRect r = cv::minAreaRect(approx);
                 float w = r.size.width;
                 float h = r.size.height;
                 if (w <= 0.0f || h <= 0.0f) continue;
                 float ratio = std::max(w, h) / std::min(w, h);
 
-                if (ratio <= 5.0f) {
+                if (ratio <= 12.0f) {
                     double rectArea = w * h;
                     double rectangularity = (rectArea > 0) ? (area / rectArea) : 0.0;
-                    if (rectangularity < 0.70) continue; // 矩形度门限
+                    if (rectangularity < 0.65) continue; // 矩形度门限
 
                     // 计算多边形质心及画面中心偏好
                     cv::Point2f polyCenter(0.0f, 0.0f);
@@ -141,12 +152,42 @@ DetectionResult EdgeDetector::detectDocument(const cv::Mat& grayFrame, bool curv
                     polyCenter.y /= 4.0f;
 
                     float distToCenter = std::hypot(polyCenter.x - frameCenter.x, polyCenter.y - frameCenter.y);
-                    float centerPreference = 1.0f - 0.4f * (distToCenter / (frameDiag * 0.5f));
-                    centerPreference = std::max(0.3f, std::min(1.0f, centerPreference));
+                    float centerPreference = 1.0f - 0.35f * (distToCenter / (frameDiag * 0.5f));
+                    centerPreference = std::max(0.35f, std::min(1.0f, centerPreference));
+
+                    // MS Lens 核心原理：内部文本与笔画能量密度评估 (Text & Stroke Saliency)
+                    // 空白玻璃车门内部几乎平坦 (meanGrad < 3.0)，而写满车站名与线路的标牌内部充满高频笔画 (meanGrad 15~60)
+                    cv::Rect polyBound = cv::boundingRect(approx);
+                    int insetX = static_cast<int>(polyBound.width * 0.12f);
+                    int insetY = static_cast<int>(polyBound.height * 0.12f);
+                    int innerX = std::max(0, polyBound.x + insetX);
+                    int innerY = std::max(0, polyBound.y + insetY);
+                    int innerW = std::max(1, polyBound.width - 2 * insetX);
+                    int innerH = std::max(1, polyBound.height - 2 * insetY);
+                    if (innerX + innerW > smallFrame.cols) innerW = smallFrame.cols - innerX;
+                    if (innerY + innerH > smallFrame.rows) innerH = smallFrame.rows - innerY;
+
+                    double sumGrad = intGrad.at<double>(innerY + innerH, innerX + innerW)
+                                   - intGrad.at<double>(innerY, innerX + innerW)
+                                   - intGrad.at<double>(innerY + innerH, innerX)
+                                   + intGrad.at<double>(innerY, innerX);
+                    double meanGrad = sumGrad / std::max(1, innerW * innerH);
+
+                    // 显著度增益：文本密度越大，显著度权重越高（从 1.0x 最高提升至 4.0x）
+                    float textSaliency = 1.0f + 3.0f * std::clamp(static_cast<float>(meanGrad - 3.5) / 16.0f, 0.0f, 1.0f);
+
+                    // 触控焦点偏好 (如果传入了触摸坐标，大幅提权包含触控点的四边形)
+                    float touchBonus = 1.0f;
+                    if (touchX >= 0.0f && touchY >= 0.0f) {
+                        cv::Point2f touchPt(touchX * smallFrame.cols, touchY * smallFrame.rows);
+                        if (cv::pointPolygonTest(approx, touchPt, false) >= 0) {
+                            touchBonus = 3.0f;
+                        }
+                    }
 
                     float areaRatio = static_cast<float>(area / frameArea);
-                    // 综合评分：矩形度 * 中心权重 * 面积权重
-                    double score = rectangularity * centerPreference * (std::sqrt(areaRatio) + 0.15);
+                    // 综合评分：矩形度 * 中心偏好 * (面积自适应平滑) * 文本显著度 * 触控加权
+                    double score = rectangularity * centerPreference * (std::sqrt(areaRatio) + 0.18) * textSaliency * touchBonus;
 
                     if (score > bestScore) {
                         bestScore = score;
@@ -463,7 +504,7 @@ std::vector<cv::Point2f> EdgeDetector::findContourAtPoint(const cv::Mat& grayMat
             float h = r.size.height;
             if (w <= 0.0f || h <= 0.0f) continue;
             float ratio = std::max(w, h) / std::min(w, h);
-            if (ratio > 5.0f) continue;
+            if (ratio > 12.0f) continue;
 
             double rectArea = w * h;
             double rectangularity = (rectArea > 0) ? (area / rectArea) : 0.0;

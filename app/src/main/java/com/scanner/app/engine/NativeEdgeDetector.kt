@@ -12,8 +12,8 @@ class NativeEdgeDetector {
         System.loadLibrary("doc_scanner_engine")
     }
 
-    fun detectDocument(grayMat: Mat, curvedMode: Boolean): DetectionResult {
-        val resultArr = nativeDetectDocument(grayMat.nativeObjAddr, curvedMode)
+    fun detectDocument(grayMat: Mat, curvedMode: Boolean, touchX: Float = -1.0f, touchY: Float = -1.0f): DetectionResult {
+        val resultArr = nativeDetectDocument(grayMat.nativeObjAddr, curvedMode, touchX, touchY)
         if (resultArr.isEmpty() || resultArr[0] == 0.0f) {
             return DetectionResult(
                 found = false,
@@ -116,7 +116,7 @@ class NativeEdgeDetector {
         return Pair(hLines, vLines)
     }
 
-    private external fun nativeDetectDocument(matAddr: Long, curvedMode: Boolean): FloatArray
+    private external fun nativeDetectDocument(matAddr: Long, curvedMode: Boolean, touchX: Float, touchY: Float): FloatArray
     private external fun nativeFindSnapPoint(edgeMatAddr: Long, touchX: Float, touchY: Float, radius: Float): FloatArray
     private external fun nativeFindLineOffset(
         edgeMatAddr: Long,
