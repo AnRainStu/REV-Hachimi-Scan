@@ -7,7 +7,7 @@
 
 # HachiCam 🐾
 
-**A pure on-device Android document scanner focused on raw image quality and low-level computational photography.**
+**A vibe-coded, fully local Android document scanner.**
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Specs: CC0 1.0](https://img.shields.io/badge/Specs-CC0%201.0-lightgrey.svg)](specs/LICENSE)
