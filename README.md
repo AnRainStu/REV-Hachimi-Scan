@@ -1,5 +1,5 @@
 > [!NOTE]
-> This is an experimental open-source project created by an individual developer with AI-assisted pair programming, exploring the limits of on-device computational photography, Camera2 low-level ISP tuning, and classical computer vision algorithms on Android. The project is in its early stages and carries notable technical debt; constructive feedback, issues, and pull requests are warmly welcomed.
+> The owner of this repo built this entirely via vibe coding, and isn't quite sure what this Agent actually does. ¯\\\_(ツ)\_/¯
 
 <div align="center">
 
