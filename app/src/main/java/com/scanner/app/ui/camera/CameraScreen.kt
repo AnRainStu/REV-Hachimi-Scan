@@ -107,13 +107,18 @@ fun CameraScreen(
                     else -> Surface.ROTATION_0
                 }
                 viewModel.imageCapture?.targetRotation = rotation
-                deviceRotationDegrees = when (rotation) {
+
+                val rawTarget = when (rotation) {
                     Surface.ROTATION_0 -> 0f
-                    Surface.ROTATION_90 -> 270f
+                    Surface.ROTATION_90 -> 90f
                     Surface.ROTATION_180 -> 180f
-                    Surface.ROTATION_270 -> 90f
+                    Surface.ROTATION_270 -> 270f
                     else -> 0f
                 }
+                var diff = (rawTarget - deviceRotationDegrees) % 360f
+                if (diff > 180f) diff -= 360f
+                if (diff < -180f) diff += 360f
+                deviceRotationDegrees += diff
             }
         }
         if (orientationListener.canDetectOrientation()) {
@@ -395,10 +400,10 @@ fun CameraScreen(
                 },
                 modifier = Modifier
                     .size(42.dp)
+                    .graphicsLayer { rotationZ = uiRotation }
                     .clip(CircleShape)
                     .background(torchBg)
                     .border(1.2.dp, torchBorder, CircleShape)
-                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Icon(
                     imageVector = if (isTorchOn) Icons.Default.FlashOn else Icons.Default.FlashOff,
@@ -411,11 +416,11 @@ fun CameraScreen(
             // Frosted pill badge indicating stability
             Box(
                 modifier = Modifier
+                    .graphicsLayer { rotationZ = uiRotation }
                     .clip(RoundedCornerShape(24.dp))
                     .background(Color(0x990A0F1D))
                     .border(1.dp, Color(0x2AFFFFFF), RoundedCornerShape(24.dp))
                     .padding(horizontal = 14.dp, vertical = 7.dp)
-                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -444,10 +449,10 @@ fun CameraScreen(
                 onClick = onNavigateToSettings,
                 modifier = Modifier
                     .size(42.dp)
+                    .graphicsLayer { rotationZ = uiRotation }
                     .clip(CircleShape)
                     .background(Color(0x990A0F1D))
                     .border(1.dp, Color(0x2AFFFFFF), CircleShape)
-                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
@@ -463,11 +468,11 @@ fun CameraScreen(
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
+                    .graphicsLayer { rotationZ = uiRotation }
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xE60F172A))
                     .border(1.dp, if (burstSuperResEnabled) PrismCyan.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(20.dp))
                     .padding(horizontal = 32.dp, vertical = 24.dp)
-                    .graphicsLayer { rotationZ = uiRotation }
             ) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -513,12 +518,12 @@ fun CameraScreen(
 
                 Box(
                     modifier = Modifier
+                        .graphicsLayer { rotationZ = uiRotation }
                         .clip(RoundedCornerShape(24.dp))
                         .background(curveBg)
                         .border(1.2.dp, curveBorder, RoundedCornerShape(24.dp))
                         .clickable { viewModel.toggleCurvedMode() }
                         .padding(horizontal = 14.dp, vertical = 8.dp)
-                        .graphicsLayer { rotationZ = uiRotation }
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
@@ -556,11 +561,11 @@ fun CameraScreen(
                     Box(
                         modifier = Modifier
                             .size(52.dp)
+                            .graphicsLayer { rotationZ = uiRotation }
                             .clip(RoundedCornerShape(16.dp))
                             .background(Color(0x990A0F1D))
                             .border(1.5.dp, Color(0x44FFFFFF), RoundedCornerShape(16.dp))
-                            .clickable { galleryLauncher.launch("image/*") }
-                            .graphicsLayer { rotationZ = uiRotation },
+                            .clickable { galleryLauncher.launch("image/*") },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -627,11 +632,11 @@ fun CameraScreen(
                         Box(
                             modifier = Modifier
                                 .size(52.dp)
+                                .graphicsLayer { rotationZ = uiRotation }
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(Color(0x990A0F1D))
                                 .border(1.5.dp, Color(0x44FFFFFF), RoundedCornerShape(16.dp))
-                                .clickable { onNavigateToReview() }
-                                .graphicsLayer { rotationZ = uiRotation },
+                                .clickable { onNavigateToReview() },
                             contentAlignment = Alignment.Center
                         ) {
                             if (lastThumbnailBitmap != null) {
