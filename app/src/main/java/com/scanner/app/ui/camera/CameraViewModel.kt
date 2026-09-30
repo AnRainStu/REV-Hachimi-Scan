@@ -224,50 +224,15 @@ class CameraViewModel : ViewModel() {
                     }
                 }
 
-                val exposureState = info?.exposureState
-                val minIndex = exposureState?.exposureCompensationRange?.lower ?: 0
-                val step = exposureState?.exposureCompensationStep?.let {
-                    if (it.denominator != 0) it.numerator.toFloat() / it.denominator.toFloat() else 1.0f
-                } ?: 1.0f
-
-                val targetHighlightIndex = if (step > 0f) {
-                    val calculated = kotlin.math.round(-1.5f / step).toInt()
-                    calculated.coerceIn(minIndex, 0)
-                } else {
-                    minIndex.coerceAtMost(0)
-                }
-
                 val tempFiles = mutableListOf<File>()
 
-                // Frame 0: EV = 0 (Base frame)
-                val file0 = File(context.cacheDir, "burst_${UUID.randomUUID()}_0.jpg")
-                if (takeSinglePicture(capture, context, file0) && file0.exists() && file0.length() > 0) {
-                    normalizeExifOrientation(file0)
-                    tempFiles.add(file0)
-                }
-
-                // Frame 1: EV = 0 (Hand micro-motion subpixel frame 1)
-                val file1 = File(context.cacheDir, "burst_${UUID.randomUUID()}_1.jpg")
-                if (takeSinglePicture(capture, context, file1) && file1.exists() && file1.length() > 0) {
-                    normalizeExifOrientation(file1)
-                    tempFiles.add(file1)
-                }
-
-                // Frame 2: EV = 0 (Hand micro-motion subpixel frame 2)
-                val file2 = File(context.cacheDir, "burst_${UUID.randomUUID()}_2.jpg")
-                if (takeSinglePicture(capture, context, file2) && file2.exists() && file2.length() > 0) {
-                    normalizeExifOrientation(file2)
-                    tempFiles.add(file2)
-                }
-
-                // Frame 3: EV = targetHighlightIndex (Highlight detail unclipped frame)
-                if (targetHighlightIndex < 0 && control != null) {
-                    setExposureIndex(control, context, targetHighlightIndex)
-                }
-                val file3 = File(context.cacheDir, "burst_${UUID.randomUUID()}_3.jpg")
-                if (takeSinglePicture(capture, context, file3) && file3.exists() && file3.length() > 0) {
-                    normalizeExifOrientation(file3)
-                    tempFiles.add(file3)
+                // Frame 0..3: Rapid 4-frame burst for subpixel super-resolution (all at native EV = 0)
+                for (i in 0 until 4) {
+                    val file = File(context.cacheDir, "burst_${UUID.randomUUID()}_$i.jpg")
+                    if (takeSinglePicture(capture, context, file) && file.exists() && file.length() > 0) {
+                        normalizeExifOrientation(file)
+                        tempFiles.add(file)
+                    }
                 }
 
                 if (tempFiles.isEmpty()) {

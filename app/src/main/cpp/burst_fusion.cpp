@@ -168,12 +168,12 @@ cv::Mat BurstFusionEngine::fuseBurstFrames(const std::vector<cv::Mat>& burstFram
                 continue;
             }
 
-            // 构造 2x 亚像素单应性矩阵: H_2x = S_2 * H * S_0.5
-            cv::Mat H2x = H.clone();
-            H2x.at<double>(0, 2) *= 2.0;
-            H2x.at<double>(1, 2) *= 2.0;
-            H2x.at<double>(2, 0) *= 0.5;
-            H2x.at<double>(2, 1) *= 0.5;
+            // 构造 1x 辅帧输入到 2x 超分画布的单应性矩阵: H_2x = S_2 * H
+            cv::Mat S2 = (cv::Mat_<double>(3, 3) <<
+                2.0, 0.0, 0.0,
+                0.0, 2.0, 0.0,
+                0.0, 0.0, 1.0);
+            cv::Mat H2x = S2 * H;
 
             // 辅帧直接通过亚像素单应性矩阵投射至 2x 高清画布
             cv::Mat candWarpedSuper;
