@@ -72,10 +72,11 @@
     <string name="fusing_super_res">正在进行 50MP 多帧超分融合&#8230;</string>
     <string name="fusing_hdr">正在进行 HDR 多曝光合成&#8230;</string>
     <string name="fusing_super_res_hdr">正在进行 50MP HDR 超分合成&#8230;</string>
-    <string name="full_hdr_title">Full HDR (底层跨品牌高动态范围)</string>
-    <string name="full_hdr_summary">接管底层 Camera2 连拍与局部色调映射管线 (测试中)</string>
+    <string name="fusing_full_hdr">Full HDR 合成中（1主3辅超分）&#8230;</string>
+    <string name="full_hdr_title">Full HDR</string>
+    <string name="full_hdr_summary">多帧亚像素超分（1主3辅）+ 多重曝光高光恢复，输出约 50MP 画质。</string>
     <string name="full_hdr_warning_title">⚠️ 实验性功能警告</string>
-    <string name="full_hdr_warning_desc">此功能为底层 Camera2 高动态范围（Full HDR）测试模式，会直接接管底层相机管线与曝光参数。在部分品牌机型、非官方驱动或第三方 ROM（如 LineageOS）上，可能会导致相机 HAL 无响应、闪退甚至系统相机服务崩溃。\n\n该模式目前仅供测试与工程评估，是否确认开启？</string>
+    <string name="full_hdr_warning_desc">Full HDR 将接管底层 Camera2 连拍管线，拍摄 4 帧（不同曝光与亚像素偏移）用于超分与高动态范围合成。拍摄时间约 3 秒，耗电相对较高。\n\n是否确认开启？</string>
     <string name="confirm_enable">确认开启</string>
     <string name="export_logs_title">导出诊断日志</string>
     <string name="export_logs_summary">打包 App 运行日志与硬件环境信息以供排障</string>

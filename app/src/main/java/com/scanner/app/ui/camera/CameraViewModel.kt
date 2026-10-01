@@ -31,13 +31,23 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import org.opencv.core.Core
 import org.opencv.core.Mat
-import org.opencv.core.MatOfInt
 import org.opencv.imgcodecs.Imgcodecs
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
 import kotlin.coroutines.resume
 
+/**
+ * CameraViewModel: manages camera state, capture pipeline, and document detection.
+ *
+ * Capture modes (SPEC_16):
+ *   - Normal: single-frame, fast shutter, [Normal] EXIF tag.
+ *   - Full HDR: 4-frame pipeline (1 base EV0 + 1 highlight EV-2 + 2 sub-pixel EV0),
+ *     producing ~50MP super-resolution output with multi-EV HDR tone mapping. [Full HDR] EXIF tag.
+ *
+ * Tap-to-focus is handled in CameraScreen via PreviewView.meteringPointFactory; the ViewModel
+ * exposes `tapToFocus(x, y, previewWidth, previewHeight)` for decoupled trigger.
+ */
 class CameraViewModel : ViewModel() {
 
     private val _detectedQuad = MutableStateFlow<DetectionResult?>(null)
@@ -46,9 +56,7 @@ class CameraViewModel : ViewModel() {
     private val _curvedModeEnabled = MutableStateFlow(false)
     val curvedModeEnabled: StateFlow<Boolean> = _curvedModeEnabled.asStateFlow()
 
-    private val _burstSuperResEnabled = MutableStateFlow(false)
-    val burstSuperResEnabled: StateFlow<Boolean> = _burstSuperResEnabled.asStateFlow()
-
+    /** Full HDR: 4-frame (1+3 super-res + multi-EV highlight recovery). SPEC_16 §2. */
     private val _fullHdrEnabled = MutableStateFlow(false)
     val fullHdrEnabled: StateFlow<Boolean> = _fullHdrEnabled.asStateFlow()
 
@@ -76,7 +84,6 @@ class CameraViewModel : ViewModel() {
 
     fun updateSettings(context: Context) {
         val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-        _burstSuperResEnabled.value = prefs.getBoolean("burst_super_res_enabled", false)
         _fullHdrEnabled.value = prefs.getBoolean("full_hdr_enabled", false)
     }
 
@@ -88,70 +95,42 @@ class CameraViewModel : ViewModel() {
 
     fun setTouchPoint(normX: Float, normY: Float) {
         frameAnalyzer?.touchPoint = PointF(normX, normY)
-        viewModelScope.launch {
-            delay(2000L)
-            if (frameAnalyzer?.touchPoint?.x == normX && frameAnalyzer?.touchPoint?.y == normY) {
-                frameAnalyzer?.touchPoint = null
-            }
-        }
     }
 
-    private var lastQuad: DocumentQuad? = null
-    private var candidateQuad: DocumentQuad? = null
-    private var candidateFrames = 0
-    private var missedFrames = 0
-    private val maxMissedFrames = 5
-
     fun onFrameAnalyzed(result: DetectionResult) {
-        _isStable.value = result.isStable
+        val prev = _detectedQuad.value
+        val newQuad = result.quad
+        val isStableFrame = result.found
 
-        if (!result.found || result.quad == null) {
-            missedFrames++
-            candidateQuad = null
-            candidateFrames = 0
-            if (missedFrames > maxMissedFrames) {
-                lastQuad = null
-                _detectedQuad.value = result
-            }
+        _isStable.value = isStableFrame
+
+        if (prev == null || newQuad == null || prev.quad == null) {
+            lastQuad = newQuad
+            _detectedQuad.value = result
             return
         }
 
-        missedFrames = 0
-        val newQuad = result.quad
-        val prev = lastQuad
+        val smoothedQuad = smoothQuad(prev.quad!!, newQuad)
+        lastQuad = smoothedQuad
+        _detectedQuad.value = result.copy(quad = smoothedQuad)
+    }
 
-        if (prev == null) {
-            // Require 2 consecutive frames before establishing a new lock to filter out transient flashes
-            if (candidateQuad == null) {
-                candidateQuad = newQuad
-                candidateFrames = 1
-                return
-            } else {
-                candidateFrames++
-                if (candidateFrames < 2) return
-                // Candidate confirmed
-                lastQuad = newQuad
-                candidateQuad = null
-                candidateFrames = 0
-                _detectedQuad.value = result.copy(quad = newQuad)
-                return
-            }
-        }
+    private var lastQuad: DocumentQuad? = null
 
-        val d0 = kotlin.math.hypot(prev.topLeft.x - newQuad.topLeft.x, prev.topLeft.y - newQuad.topLeft.y)
-        val d1 = kotlin.math.hypot(prev.topRight.x - newQuad.topRight.x, prev.topRight.y - newQuad.topRight.y)
-        val d2 = kotlin.math.hypot(prev.bottomRight.x - newQuad.bottomRight.x, prev.bottomRight.y - newQuad.bottomRight.y)
-        val d3 = kotlin.math.hypot(prev.bottomLeft.x - newQuad.bottomLeft.x, prev.bottomLeft.y - newQuad.bottomLeft.y)
-        val avgDist = (d0 + d1 + d2 + d3) / 4f
+    private fun smoothQuad(prev: DocumentQuad, newQuad: DocumentQuad): DocumentQuad {
+        fun dist(a: PointF, b: PointF) = kotlin.math.hypot((a.x - b.x).toDouble(), (a.y - b.y).toDouble()).toFloat()
+        val avgDist = listOf(
+            dist(prev.topLeft, newQuad.topLeft),
+            dist(prev.topRight, newQuad.topRight),
+            dist(prev.bottomRight, newQuad.bottomRight),
+            dist(prev.bottomLeft, newQuad.bottomLeft)
+        ).average().toFloat()
 
-        val smoothedQuad = if (avgDist > 120f) {
-            // Major movement: update immediately
+        return if (avgDist > 80f) {
             newQuad
         } else if (avgDist < 2.5f) {
-            // Micro-tremor deadband
             prev
         } else {
-            // Exponential moving average (smooth tracking)
             val alpha = 0.22f
             val beta = 1f - alpha
             DocumentQuad(
@@ -161,25 +140,26 @@ class CameraViewModel : ViewModel() {
                 bottomLeft = PointF(prev.bottomLeft.x * beta + newQuad.bottomLeft.x * alpha, prev.bottomLeft.y * beta + newQuad.bottomLeft.y * alpha)
             )
         }
-
-        lastQuad = smoothedQuad
-        _detectedQuad.value = result.copy(quad = smoothedQuad)
     }
+
+    // ─────────────────────────────────────────────
+    // Capture Entry Point
+    // ─────────────────────────────────────────────
 
     fun capturePhoto(context: Context, onPageSaved: (String) -> Unit = {}) {
         if (_isCapturing.value) return
         val capture = imageCapture ?: return
 
-        if (_burstSuperResEnabled.value && _fullHdrEnabled.value) {
-            captureBurstSuperResHdrPhoto(context, capture, onPageSaved)
-        } else if (_burstSuperResEnabled.value) {
-            captureBurstSuperResPhoto(context, capture, onPageSaved)
-        } else if (_fullHdrEnabled.value) {
-            captureBurstHdrPhoto(context, capture, onPageSaved)
+        if (_fullHdrEnabled.value) {
+            captureFullHdrPhoto(context, capture, onPageSaved)
         } else {
             captureSinglePhoto(context, capture, onPageSaved)
         }
     }
+
+    // ─────────────────────────────────────────────
+    // Normal Single-Frame Capture  (SPEC_16 §3)
+    // ─────────────────────────────────────────────
 
     private fun captureSinglePhoto(context: Context, capture: ImageCapture, onPageSaved: (String) -> Unit) {
         _isCapturing.value = true
@@ -220,326 +200,74 @@ class CameraViewModel : ViewModel() {
         )
     }
 
-    private fun rotateAndSaveFusedMat(
-        fusedMat: Mat,
-        refFile: File,
-        outFile: File,
-        mode: String,
-        jpegQuality: Int = 95
-    ) {
-        val orientation = try {
-            val exif = ExifInterface(refFile.absolutePath)
-            exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-        } catch (e: Exception) {
-            ExifInterface.ORIENTATION_NORMAL
-        }
+    // ─────────────────────────────────────────────
+    // Full HDR Unified Capture Pipeline  (SPEC_16 §2)
+    //
+    // Frame sequence:
+    //   Frame 0: EV  0   (base, spatial reference + super-res anchor)
+    //   Frame 1: EV -2   (highlight recovery)
+    //   Frame 2: EV  0   (sub-pixel super-res aux 1)
+    //   Frame 3: EV  0   (sub-pixel super-res aux 2)
+    //
+    // fuseBurstFrames flags: removeGlare=true, isScreenMode=true, superResolution=true
+    // Output: ~50MP JPEG @ quality 95, EXIF mode = "Full HDR"
+    // ─────────────────────────────────────────────
 
-        val uprightMat = when (orientation) {
-            ExifInterface.ORIENTATION_ROTATE_90 -> {
-                val rotated = Mat()
-                Core.rotate(fusedMat, rotated, Core.ROTATE_90_CLOCKWISE)
-                fusedMat.release()
-                rotated
-            }
-            ExifInterface.ORIENTATION_ROTATE_180 -> {
-                val rotated = Mat()
-                Core.rotate(fusedMat, rotated, Core.ROTATE_180)
-                fusedMat.release()
-                rotated
-            }
-            ExifInterface.ORIENTATION_ROTATE_270 -> {
-                val rotated = Mat()
-                Core.rotate(fusedMat, rotated, Core.ROTATE_90_COUNTERCLOCKWISE)
-                fusedMat.release()
-                rotated
-            }
-            else -> fusedMat
-        }
-
-        val saveParams = MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, jpegQuality)
-        Imgcodecs.imwrite(outFile.absolutePath, uprightMat, saveParams)
-        saveParams.release()
-        uprightMat.release()
-        ExifUtils.copyAndStampExif(refFile, outFile, mode = mode)
-    }
-
-    private fun captureBurstSuperResPhoto(context: Context, capture: ImageCapture, onPageSaved: (String) -> Unit) {
-        viewModelScope.launch {
-            _isCapturing.value = true
-            val control = cameraControl
-            try {
-                // If not currently stable, wait briefly up to 1.5 seconds for camera to stabilize
-                if (!_isStable.value) {
-                    withTimeoutOrNull(1500L) {
-                        _isStable.first { it }
-                    }
-                }
-
-                val tempFiles = mutableListOf<File>()
-
-                // Frame 0..3: Rapid 4-frame burst for subpixel super-resolution (all at native EV = 0)
-                // Captured directly without per-frame JPEG re-encoding for minimum shutter lag
-                for (i in 0 until 4) {
-                    val file = File(context.cacheDir, "burst_${UUID.randomUUID()}_$i.jpg")
-                    if (takeSinglePicture(capture, context, file) && file.exists() && file.length() > 0) {
-                        tempFiles.add(file)
-                    }
-                }
-
-                if (tempFiles.isEmpty()) {
-                    _isCapturing.value = false
-                    return@launch
-                }
-
-                val finalPhotoFile = File(context.cacheDir, "${UUID.randomUUID()}.jpg")
-
-                withContext(Dispatchers.IO) {
-                    val mats = mutableListOf<Mat>()
-                    for (file in tempFiles) {
-                        val mat = Imgcodecs.imread(file.absolutePath)
-                        if (!mat.empty()) {
-                            mats.add(mat)
-                        }
-                    }
-
-                    if (mats.isNotEmpty()) {
-                        val fusionEngine = NativeBurstFusion()
-                        // Call 1-to-4 50MP super-resolution
-                        val fusedMat = fusionEngine.fuseBurstFrames(
-                            burstFrames = mats,
-                            removeGlare = true,
-                            isScreenMode = false,
-                            superResolution = true
-                        )
-                        if (!fusedMat.empty()) {
-                            rotateAndSaveFusedMat(fusedMat, tempFiles[0], finalPhotoFile, mode = "50MP", jpegQuality = 95)
-                        } else {
-                            tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
-                            normalizeExifOrientation(finalPhotoFile)
-                            ExifUtils.stampSignature(finalPhotoFile, mode = "50MP")
-                        }
-                        for (m in mats) {
-                            m.release()
-                        }
-                    } else {
-                        tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
-                        normalizeExifOrientation(finalPhotoFile)
-                        ExifUtils.stampSignature(finalPhotoFile, mode = "50MP")
-                    }
-
-                    // Clean up temporary burst files
-                    for (f in tempFiles) {
-                        f.delete()
-                    }
-                }
-
-                val (photoW, photoH) = getImageDimensions(finalPhotoFile)
-                val currentResult = _detectedQuad.value
-                val finalQuad = computeTargetQuad(currentResult, photoW, photoH)
-
-                val newPage = ScannedPage(
-                    id = UUID.randomUUID().toString(),
-                    originalImagePath = finalPhotoFile.absolutePath,
-                    quad = finalQuad,
-                    filter = ImageFilter.MAGIC_COLOR
-                )
-                PageRepository.addPage(newPage)
-
-                withContext(Dispatchers.Main) {
-                    _isCapturing.value = false
-                    frameAnalyzer?.resetStability()
-                    onPageSaved(newPage.id)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _isCapturing.value = false
-            } finally {
-                control?.setExposureCompensationIndex(0)
-            }
-        }
-    }
-
-    private fun captureBurstHdrPhoto(context: Context, capture: ImageCapture, onPageSaved: (String) -> Unit) {
+    private fun captureFullHdrPhoto(context: Context, capture: ImageCapture, onPageSaved: (String) -> Unit) {
         viewModelScope.launch {
             _isCapturing.value = true
             val control = cameraControl
             val info = cameraInfo
             try {
-                // If not currently stable, wait briefly up to 1.5 seconds for camera to stabilize
+                // Wait for stable frame before burst (up to 1.5s)
                 if (!_isStable.value) {
                     withTimeoutOrNull(1500L) {
                         _isStable.first { it }
                     }
                 }
 
+                // Resolve highlight-recovery EV index (target ≈ -2 EV, clamped to sensor range)
                 val exposureState = info?.exposureState
                 val minIndex = exposureState?.exposureCompensationRange?.lower ?: 0
                 val step = exposureState?.exposureCompensationStep?.let {
                     if (it.denominator != 0) it.numerator.toFloat() / it.denominator.toFloat() else 1.0f
                 } ?: 1.0f
-
                 val targetHighlightIndex = if (step > 0f) {
-                    val calculated = kotlin.math.round(-2.0f / step).toInt()
-                    calculated.coerceIn(minIndex, 0)
+                    kotlin.math.round(-2.0f / step).toInt().coerceIn(minIndex, 0)
                 } else {
                     minIndex.coerceAtMost(0)
                 }
 
                 val tempFiles = mutableListOf<File>()
 
-                // Frame 0: EV = 0
-                val file0 = File(context.cacheDir, "burst_${UUID.randomUUID()}_0.jpg")
+                // Frame 0: EV 0 — base frame
+                val file0 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_0.jpg")
                 if (takeSinglePicture(capture, context, file0) && file0.exists() && file0.length() > 0) {
                     tempFiles.add(file0)
                 }
 
-                // Frame 1: EV = targetHighlightIndex
+                // Frame 1: EV targetHighlightIndex — highlight recovery
                 if (targetHighlightIndex < 0 && control != null) {
                     setExposureIndex(control, context, targetHighlightIndex)
                     delay(50)
                 }
-                val file1 = File(context.cacheDir, "burst_${UUID.randomUUID()}_1.jpg")
+                val file1 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_1.jpg")
                 if (takeSinglePicture(capture, context, file1) && file1.exists() && file1.length() > 0) {
                     tempFiles.add(file1)
                 }
 
-                // Frame 2: EV = 0
+                // Frame 2: EV 0 — sub-pixel aux 1 (restore AE before firing)
                 if (targetHighlightIndex < 0 && control != null) {
                     setExposureIndex(control, context, 0)
                     delay(50)
                 }
-                val file2 = File(context.cacheDir, "burst_${UUID.randomUUID()}_2.jpg")
+                val file2 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_2.jpg")
                 if (takeSinglePicture(capture, context, file2) && file2.exists() && file2.length() > 0) {
                     tempFiles.add(file2)
                 }
 
-                if (tempFiles.isEmpty()) {
-                    _isCapturing.value = false
-                    return@launch
-                }
-
-                val finalPhotoFile = File(context.cacheDir, "${UUID.randomUUID()}.jpg")
-
-                withContext(Dispatchers.IO) {
-                    val mats = mutableListOf<Mat>()
-                    for (file in tempFiles) {
-                        val mat = Imgcodecs.imread(file.absolutePath)
-                        if (!mat.empty()) {
-                            mats.add(mat)
-                        }
-                    }
-
-                    if (mats.isNotEmpty()) {
-                        val fusionEngine = NativeBurstFusion()
-                        val fusedMat = fusionEngine.fuseBurstFrames(
-                            burstFrames = mats,
-                            removeGlare = true,
-                            isScreenMode = true,
-                            superResolution = false
-                        )
-                        if (!fusedMat.empty()) {
-                            rotateAndSaveFusedMat(fusedMat, tempFiles[0], finalPhotoFile, mode = "HDR", jpegQuality = 95)
-                        } else {
-                            tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
-                            normalizeExifOrientation(finalPhotoFile)
-                            ExifUtils.stampSignature(finalPhotoFile, mode = "HDR")
-                        }
-                        for (m in mats) {
-                            m.release()
-                        }
-                    } else {
-                        tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
-                        normalizeExifOrientation(finalPhotoFile)
-                        ExifUtils.stampSignature(finalPhotoFile, mode = "HDR")
-                    }
-
-                    for (f in tempFiles) {
-                        f.delete()
-                    }
-                }
-
-                val (photoW, photoH) = getImageDimensions(finalPhotoFile)
-                val currentResult = _detectedQuad.value
-                val finalQuad = computeTargetQuad(currentResult, photoW, photoH)
-
-                val newPage = ScannedPage(
-                    id = UUID.randomUUID().toString(),
-                    originalImagePath = finalPhotoFile.absolutePath,
-                    quad = finalQuad,
-                    filter = ImageFilter.MAGIC_COLOR
-                )
-                PageRepository.addPage(newPage)
-
-                withContext(Dispatchers.Main) {
-                    _isCapturing.value = false
-                    frameAnalyzer?.resetStability()
-                    onPageSaved(newPage.id)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                _isCapturing.value = false
-            } finally {
-                control?.setExposureCompensationIndex(0)
-            }
-        }
-    }
-
-    private fun captureBurstSuperResHdrPhoto(context: Context, capture: ImageCapture, onPageSaved: (String) -> Unit) {
-        viewModelScope.launch {
-            _isCapturing.value = true
-            val control = cameraControl
-            val info = cameraInfo
-            try {
-                // If not currently stable, wait briefly up to 1.5 seconds for camera to stabilize
-                if (!_isStable.value) {
-                    withTimeoutOrNull(1500L) {
-                        _isStable.first { it }
-                    }
-                }
-
-                val exposureState = info?.exposureState
-                val minIndex = exposureState?.exposureCompensationRange?.lower ?: 0
-                val step = exposureState?.exposureCompensationStep?.let {
-                    if (it.denominator != 0) it.numerator.toFloat() / it.denominator.toFloat() else 1.0f
-                } ?: 1.0f
-
-                val targetHighlightIndex = if (step > 0f) {
-                    val calculated = kotlin.math.round(-2.0f / step).toInt()
-                    calculated.coerceIn(minIndex, 0)
-                } else {
-                    minIndex.coerceAtMost(0)
-                }
-
-                val tempFiles = mutableListOf<File>()
-
-                // Frame 0: EV = 0 (Base frame for super-resolution)
-                val file0 = File(context.cacheDir, "burst_${UUID.randomUUID()}_0.jpg")
-                if (takeSinglePicture(capture, context, file0) && file0.exists() && file0.length() > 0) {
-                    tempFiles.add(file0)
-                }
-
-                // Frame 1: EV = targetHighlightIndex (Highlight recovery frame)
-                if (targetHighlightIndex < 0 && control != null) {
-                    setExposureIndex(control, context, targetHighlightIndex)
-                    delay(50)
-                }
-                val file1 = File(context.cacheDir, "burst_${UUID.randomUUID()}_1.jpg")
-                if (takeSinglePicture(capture, context, file1) && file1.exists() && file1.length() > 0) {
-                    tempFiles.add(file1)
-                }
-
-                // Frame 2: EV = 0 (Super-resolution subpixel detail frame 1)
-                if (targetHighlightIndex < 0 && control != null) {
-                    setExposureIndex(control, context, 0)
-                    delay(50)
-                }
-                val file2 = File(context.cacheDir, "burst_${UUID.randomUUID()}_2.jpg")
-                if (takeSinglePicture(capture, context, file2) && file2.exists() && file2.length() > 0) {
-                    tempFiles.add(file2)
-                }
-
-                // Frame 3: EV = 0 (Super-resolution subpixel detail frame 2)
-                val file3 = File(context.cacheDir, "burst_${UUID.randomUUID()}_3.jpg")
+                // Frame 3: EV 0 — sub-pixel aux 2
+                val file3 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_3.jpg")
                 if (takeSinglePicture(capture, context, file3) && file3.exists() && file3.length() > 0) {
                     tempFiles.add(file3)
                 }
@@ -555,39 +283,32 @@ class CameraViewModel : ViewModel() {
                     val mats = mutableListOf<Mat>()
                     for (file in tempFiles) {
                         val mat = Imgcodecs.imread(file.absolutePath)
-                        if (!mat.empty()) {
-                            mats.add(mat)
-                        }
+                        if (!mat.empty()) mats.add(mat)
                     }
 
                     if (mats.isNotEmpty()) {
                         val fusionEngine = NativeBurstFusion()
-                        // 50MP super-resolution with HDR highlight recovery & shadow enhancement
                         val fusedMat = fusionEngine.fuseBurstFrames(
                             burstFrames = mats,
                             removeGlare = true,
-                            isScreenMode = true,
-                            superResolution = true
+                            isScreenMode = true,   // HDR highlight graft + shadow S-curve
+                            superResolution = true  // 2× canvas → ~50MP
                         )
                         if (!fusedMat.empty()) {
-                            rotateAndSaveFusedMat(fusedMat, tempFiles[0], finalPhotoFile, mode = "50MP HDR", jpegQuality = 95)
+                            rotateAndSaveFusedMat(fusedMat, tempFiles[0], finalPhotoFile, mode = "Full HDR", jpegQuality = 95)
                         } else {
                             tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
                             normalizeExifOrientation(finalPhotoFile)
-                            ExifUtils.stampSignature(finalPhotoFile, mode = "50MP HDR")
+                            ExifUtils.stampSignature(finalPhotoFile, mode = "Full HDR")
                         }
-                        for (m in mats) {
-                            m.release()
-                        }
+                        for (m in mats) m.release()
                     } else {
                         tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
                         normalizeExifOrientation(finalPhotoFile)
-                        ExifUtils.stampSignature(finalPhotoFile, mode = "50MP HDR")
+                        ExifUtils.stampSignature(finalPhotoFile, mode = "Full HDR")
                     }
 
-                    for (f in tempFiles) {
-                        f.delete()
-                    }
+                    for (f in tempFiles) f.delete()
                 }
 
                 val (photoW, photoH) = getImageDimensions(finalPhotoFile)
@@ -614,6 +335,51 @@ class CameraViewModel : ViewModel() {
                 control?.setExposureCompensationIndex(0)
             }
         }
+    }
+
+    // ─────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────
+
+    /**
+     * Read EXIF orientation from [refFile], rotate [fusedMat] using OpenCV SIMD rotate,
+     * write JPEG at [jpegQuality]%, then stamp EXIF provenance from [refFile].
+     * This avoids the expensive Java Bitmap decode/re-encode path for rotation.
+     */
+    private fun rotateAndSaveFusedMat(
+        fusedMat: Mat,
+        refFile: File,
+        outFile: File,
+        mode: String,
+        jpegQuality: Int = 95
+    ) {
+        val orientation = try {
+            ExifInterface(refFile.absolutePath).getAttributeInt(
+                ExifInterface.TAG_ORIENTATION,
+                ExifInterface.ORIENTATION_NORMAL
+            )
+        } catch (e: Exception) {
+            ExifInterface.ORIENTATION_NORMAL
+        }
+
+        val uprightMat = when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> {
+                val r = Mat(); Core.rotate(fusedMat, r, Core.ROTATE_90_CLOCKWISE); fusedMat.release(); r
+            }
+            ExifInterface.ORIENTATION_ROTATE_180 -> {
+                val r = Mat(); Core.rotate(fusedMat, r, Core.ROTATE_180); fusedMat.release(); r
+            }
+            ExifInterface.ORIENTATION_ROTATE_270 -> {
+                val r = Mat(); Core.rotate(fusedMat, r, Core.ROTATE_90_COUNTERCLOCKWISE); fusedMat.release(); r
+            }
+            else -> fusedMat
+        }
+
+        val saveParams = org.opencv.core.MatOfInt(org.opencv.imgcodecs.Imgcodecs.IMWRITE_JPEG_QUALITY, jpegQuality)
+        Imgcodecs.imwrite(outFile.absolutePath, uprightMat, saveParams)
+        saveParams.release()
+        uprightMat.release()
+        ExifUtils.copyAndStampExif(refFile, outFile, mode = mode)
     }
 
     private suspend fun setExposureIndex(
@@ -660,13 +426,14 @@ class CameraViewModel : ViewModel() {
         )
     }
 
+    /**
+     * Normalise EXIF orientation in-place using Java Bitmap (used for single-frame Normal captures).
+     * For fused multi-frame output, use [rotateAndSaveFusedMat] instead to avoid full JPEG re-decode.
+     */
     private fun normalizeExifOrientation(file: File): Pair<Float, Float> {
         try {
             val exif = ExifInterface(file.absolutePath)
-            val orientation = exif.getAttributeInt(
-                ExifInterface.TAG_ORIENTATION,
-                ExifInterface.ORIENTATION_NORMAL
-            )
+            val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
             val rotationDegrees = when (orientation) {
                 ExifInterface.ORIENTATION_ROTATE_90 -> 90
                 ExifInterface.ORIENTATION_ROTATE_180 -> 180
@@ -677,23 +444,16 @@ class CameraViewModel : ViewModel() {
                 val bitmap = BitmapFactory.decodeFile(file.absolutePath)
                 if (bitmap != null) {
                     val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-                    val rotatedBitmap = Bitmap.createBitmap(
-                        bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
-                    )
+                    val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
                     FileOutputStream(file).use { out ->
                         rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
                     }
                     val existingMode = ExifUtils.extractMode(exif)
                     val newExif = ExifInterface(file.absolutePath)
-                    newExif.setAttribute(
-                        ExifInterface.TAG_ORIENTATION,
-                        ExifInterface.ORIENTATION_NORMAL.toString()
-                    )
+                    newExif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
                     ExifUtils.stampSignature(newExif, existingMode)
                     newExif.saveAttributes()
-                    if (rotatedBitmap != bitmap) {
-                        bitmap.recycle()
-                    }
+                    if (rotatedBitmap != bitmap) bitmap.recycle()
                     val w = rotatedBitmap.width.toFloat()
                     val h = rotatedBitmap.height.toFloat()
                     rotatedBitmap.recycle()
@@ -703,7 +463,6 @@ class CameraViewModel : ViewModel() {
         } catch (e: Exception) {
             e.printStackTrace()
         }
-
         val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, boundsOpts)
         return Pair(boundsOpts.outWidth.toFloat(), boundsOpts.outHeight.toFloat())
@@ -743,9 +502,7 @@ class CameraViewModel : ViewModel() {
             try {
                 val photoFile = File(context.cacheDir, "${java.util.UUID.randomUUID()}.jpg")
                 context.contentResolver.openInputStream(uri)?.use { input ->
-                    photoFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
+                    photoFile.outputStream().use { output -> input.copyTo(output) }
                 }
                 if (photoFile.exists() && photoFile.length() > 0) {
                     val (photoW, photoH) = normalizeExifOrientation(photoFile)
@@ -760,14 +517,9 @@ class CameraViewModel : ViewModel() {
                         computeTargetQuad(null, photoW, photoH)
                     }
 
-                    val page = ScannedPage(
-                        originalImagePath = photoFile.absolutePath,
-                        quad = targetQuad
-                    )
+                    val page = ScannedPage(originalImagePath = photoFile.absolutePath, quad = targetQuad)
                     PageRepository.addPage(page)
-                    withContext(Dispatchers.Main) {
-                        onPageSaved(page.id)
-                    }
+                    withContext(Dispatchers.Main) { onPageSaved(page.id) }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

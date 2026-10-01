@@ -5,6 +5,7 @@ import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.FocusMeteringAction
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.Preview
@@ -26,12 +27,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import java.io.File
+import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlin.math.min
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.FlashOff
@@ -44,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -57,6 +59,11 @@ import android.net.Uri
 import android.view.ViewGroup
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import android.view.OrientationEventListener
+import android.view.Surface
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.R
 import com.scanner.app.domain.model.DetectionResult
@@ -64,14 +71,8 @@ import com.scanner.app.engine.NativeEdgeDetector
 import com.scanner.app.ui.theme.PrismCyan
 import com.scanner.app.ui.theme.SteadyEmerald
 import com.scanner.app.ui.theme.SteadyAmber
-import android.content.res.Configuration
-import android.view.OrientationEventListener
-import android.view.Surface
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
 import java.util.concurrent.Executors
+import kotlinx.coroutines.delay
 
 @androidx.annotation.OptIn(ExperimentalCamera2Interop::class)
 @Composable
@@ -86,7 +87,6 @@ fun CameraScreen(
 
     val detectedQuad by viewModel.detectedQuad.collectAsState()
     val curvedModeEnabled by viewModel.curvedModeEnabled.collectAsState()
-    val burstSuperResEnabled by viewModel.burstSuperResEnabled.collectAsState()
     val fullHdrEnabled by viewModel.fullHdrEnabled.collectAsState()
     val isStable by viewModel.isStable.collectAsState()
     val isCapturing by viewModel.isCapturing.collectAsState()
@@ -104,9 +104,7 @@ fun CameraScreen(
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose {
-            lifecycleOwner.lifecycle.removeObserver(observer)
-        }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     var deviceRotationDegrees by remember { mutableFloatStateOf(0f) }
@@ -135,12 +133,8 @@ fun CameraScreen(
                 deviceRotationDegrees += diff
             }
         }
-        if (orientationListener.canDetectOrientation()) {
-            orientationListener.enable()
-        }
-        onDispose {
-            orientationListener.disable()
-        }
+        if (orientationListener.canDetectOrientation()) orientationListener.enable()
+        onDispose { orientationListener.disable() }
     }
 
     val uiRotation by animateFloatAsState(
@@ -161,9 +155,7 @@ fun CameraScreen(
                     val sampleSize = max(1, min(boundsOpts.outWidth / 120, boundsOpts.outHeight / 120))
                     val opts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
                     BitmapFactory.decodeFile(path, opts)
-                } catch (e: Exception) {
-                    null
-                }
+                } catch (e: Exception) { null }
             } else null
         } else null
     }
@@ -172,13 +164,25 @@ fun CameraScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
-            viewModel.importFromUri(context, uri) { pageId ->
-                onNavigateToCrop(pageId)
-            }
+            viewModel.importFromUri(context, uri) { pageId -> onNavigateToCrop(pageId) }
         }
     }
 
-    // Animated stability pulse effect
+    // ─── Tap-to-focus state (SPEC_16 §4) ───
+    // tapFocusOffset: screen pixel coords of last tap; null = no active focus ring
+    var tapFocusOffset by remember { mutableStateOf<Offset?>(null) }
+    // We need a reference to the PreviewView to create a MeteringPointFactory
+    val previewViewRef = remember { mutableStateOf<PreviewView?>(null) }
+
+    LaunchedEffect(tapFocusOffset) {
+        if (tapFocusOffset != null) {
+            // Focus ring shows for 1.5s then auto-clears (camera also auto-cancels after 3s)
+            delay(1500)
+            tapFocusOffset = null
+        }
+    }
+
+    // ─── Ring & pulse animations ───
     val infiniteTransition = rememberInfiniteTransition(label = "pulseTransition")
     val pulseAlpha by infiniteTransition.animateFloat(
         initialValue = 0.5f,
@@ -190,9 +194,7 @@ fun CameraScreen(
         label = "pulseAlpha"
     )
 
-    // Shutter outer ring color based on stability, burst super-res, or full HDR mode
     val targetRingColor = when {
-        burstSuperResEnabled -> PrismCyan
         fullHdrEnabled -> Color(0xFFFFB74D)
         isStable -> SteadyEmerald
         else -> Color.White.copy(alpha = 0.45f)
@@ -203,12 +205,11 @@ fun CameraScreen(
         label = "stabilityRingColor"
     )
     val ringWidth by animateDpAsState(
-        targetValue = if (isStable || burstSuperResEnabled || fullHdrEnabled) 4.dp else 2.5.dp,
+        targetValue = if (isStable || fullHdrEnabled) 4.dp else 2.5.dp,
         animationSpec = tween(durationMillis = 250),
         label = "ringWidth"
     )
 
-    // Shutter press spring animation
     val shutterInteractionSource = remember { MutableInteractionSource() }
     val isShutterPressed by shutterInteractionSource.collectIsPressedAsState()
     val shutterScale by animateFloatAsState(
@@ -221,25 +222,15 @@ fun CameraScreen(
     var cameraControl by remember { mutableStateOf<androidx.camera.core.CameraControl?>(null) }
 
     DisposableEffect(Unit) {
-        onDispose {
-            cameraControl?.enableTorch(false)
-        }
+        onDispose { cameraControl?.enableTorch(false) }
     }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    viewModel.setTouchPoint(
-                        offset.x / size.width.toFloat(),
-                        offset.y / size.height.toFloat()
-                    )
-                }
-            }
     ) {
-        // 1. Fullscreen Viewfinder (Edge-to-Edge)
+        // ─── 1. Fullscreen Viewfinder ───
         AndroidView(
             factory = { ctx ->
                 val previewView = PreviewView(ctx).apply {
@@ -249,6 +240,7 @@ fun CameraScreen(
                     )
                     scaleType = PreviewView.ScaleType.FIT_CENTER
                 }
+                previewViewRef.value = previewView
 
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
                 val executor = ContextCompat.getMainExecutor(ctx)
@@ -272,53 +264,23 @@ fun CameraScreen(
                             it.setSurfaceProvider(previewView.surfaceProvider)
                         }
 
-                    // Low latency capture mode for rapid multi-frame burst and sub-pixel super-resolution
+                    // Low latency capture mode for rapid multi-frame burst (SPEC_16 §2)
                     val imageCaptureBuilder = ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                         .setJpegQuality(95)
                         .setResolutionSelector(sensorResolutionSelector)
 
                     val camera2Extender = Camera2Interop.Extender(imageCaptureBuilder)
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.EDGE_MODE,
-                        CaptureRequest.EDGE_MODE_HIGH_QUALITY
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.NOISE_REDUCTION_MODE,
-                        CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.HOT_PIXEL_MODE,
-                        CaptureRequest.HOT_PIXEL_MODE_HIGH_QUALITY
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.COLOR_CORRECTION_MODE,
-                        CaptureRequest.COLOR_CORRECTION_MODE_HIGH_QUALITY
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.SHADING_MODE,
-                        CaptureRequest.SHADING_MODE_HIGH_QUALITY
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.DISTORTION_CORRECTION_MODE,
-                        CaptureRequest.DISTORTION_CORRECTION_MODE_HIGH_QUALITY
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE,
-                        CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE,
-                        CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE,
-                        CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF
-                    )
-                    camera2Extender.setCaptureRequestOption(
-                        CaptureRequest.TONEMAP_MODE,
-                        CaptureRequest.TONEMAP_MODE_HIGH_QUALITY
-                    )
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CaptureRequest.EDGE_MODE_HIGH_QUALITY)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CaptureRequest.NOISE_REDUCTION_MODE_HIGH_QUALITY)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.HOT_PIXEL_MODE, CaptureRequest.HOT_PIXEL_MODE_HIGH_QUALITY)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.COLOR_CORRECTION_MODE, CaptureRequest.COLOR_CORRECTION_MODE_HIGH_QUALITY)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.SHADING_MODE, CaptureRequest.SHADING_MODE_HIGH_QUALITY)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.DISTORTION_CORRECTION_MODE, CaptureRequest.DISTORTION_CORRECTION_MODE_HIGH_QUALITY)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE, CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE, CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE_ON)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE, CaptureRequest.CONTROL_VIDEO_STABILIZATION_MODE_OFF)
+                    camera2Extender.setCaptureRequestOption(CaptureRequest.TONEMAP_MODE, CaptureRequest.TONEMAP_MODE_HIGH_QUALITY)
 
                     val imageCapture = imageCaptureBuilder.build()
                     viewModel.imageCapture = imageCapture
@@ -327,9 +289,7 @@ fun CameraScreen(
                     val frameAnalyzer = com.scanner.app.data.camera.FrameAnalyzer(
                         detector = edgeDetector,
                         curvedMode = curvedModeEnabled
-                    ) { result ->
-                        viewModel.onFrameAnalyzed(result)
-                    }
+                    ) { result -> viewModel.onFrameAnalyzed(result) }
                     viewModel.frameAnalyzer = frameAnalyzer
 
                     val imageAnalysis = ImageAnalysis.Builder()
@@ -342,10 +302,7 @@ fun CameraScreen(
                                     )
                                 )
                                 .setAspectRatioStrategy(
-                                    AspectRatioStrategy(
-                                        AspectRatio.RATIO_4_3,
-                                        AspectRatioStrategy.FALLBACK_RULE_AUTO
-                                    )
+                                    AspectRatioStrategy(AspectRatio.RATIO_4_3, AspectRatioStrategy.FALLBACK_RULE_AUTO)
                                 )
                                 .build()
                         )
@@ -363,11 +320,7 @@ fun CameraScreen(
                     try {
                         cameraProvider.unbindAll()
                         val camera = cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            cameraSelector,
-                            preview,
-                            imageCapture,
-                            imageAnalysis
+                            lifecycleOwner, cameraSelector, preview, imageCapture, imageAnalysis
                         )
                         cameraControl = camera.cameraControl
                         viewModel.cameraControl = camera.cameraControl
@@ -380,10 +333,26 @@ fun CameraScreen(
 
                 previewView
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    // Tap-to-focus: AF + AE at tap location (SPEC_16 §4)
+                    detectTapGestures { offset ->
+                        tapFocusOffset = offset
+                        val pv = previewViewRef.value ?: return@detectTapGestures
+                        val ctrl = cameraControl ?: return@detectTapGestures
+                        val factory = pv.meteringPointFactory
+                        val point = factory.createPoint(offset.x, offset.y)
+                        val action = FocusMeteringAction.Builder(point)
+                            .addPoint(point, FocusMeteringAction.FLAG_AE)
+                            .setAutoCancelDuration(3, TimeUnit.SECONDS)
+                            .build()
+                        ctrl.startFocusAndMetering(action)
+                    }
+                }
         )
 
-        // 2. Real-time Document Edge Overlay
+        // ─── 2. Real-time Document Edge Overlay ───
         detectedQuad?.let { quad ->
             EdgeOverlay(
                 detectionResult = quad,
@@ -392,7 +361,24 @@ fun CameraScreen(
             )
         }
 
-        // 3. Top Floating Status & Action Bar (MS Lens style)
+        // ─── 3. Tap-to-Focus Ring (SPEC_16 §4.3) ───
+        tapFocusOffset?.let { offset ->
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            val focusRingSize = 72.dp
+            val offsetXDp = with(density) { offset.x.toDp() }
+            val offsetYDp = with(density) { offset.y.toDp() }
+            Box(
+                modifier = Modifier
+                    .offset(
+                        x = offsetXDp - focusRingSize / 2,
+                        y = offsetYDp - focusRingSize / 2
+                    )
+                    .size(focusRingSize)
+                    .border(1.5.dp, Color.White.copy(alpha = 0.9f), RoundedCornerShape(4.dp))
+            )
+        }
+
+        // ─── 4. Top Status Bar ───
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -402,7 +388,7 @@ fun CameraScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Torch / Constant Light Toggle Button
+            // Torch toggle
             val torchBg = if (isTorchOn) Color(0x66FBBF24) else Color(0x990A0F1D)
             val torchBorder = if (isTorchOn) Color(0xFFFBBF24) else Color(0x2AFFFFFF)
             val torchTint = if (isTorchOn) Color(0xFFFBBF24) else Color.White.copy(alpha = 0.85f)
@@ -428,7 +414,7 @@ fun CameraScreen(
                 )
             }
 
-            // Frosted pill badge indicating stability
+            // Stability pill
             Box(
                 modifier = Modifier
                     .graphicsLayer { rotationZ = uiRotation }
@@ -459,7 +445,7 @@ fun CameraScreen(
                 }
             }
 
-            // Frosted Settings Button
+            // Settings button
             IconButton(
                 onClick = onNavigateToSettings,
                 modifier = Modifier
@@ -478,7 +464,7 @@ fun CameraScreen(
             }
         }
 
-        // 4. Center Processing / Burst Fusing Modal
+        // ─── 5. Center Capture Processing Modal ───
         if (isCapturing) {
             Box(
                 modifier = Modifier
@@ -488,11 +474,7 @@ fun CameraScreen(
                     .background(Color(0xE60F172A))
                     .border(
                         1.dp,
-                        when {
-                            burstSuperResEnabled -> PrismCyan.copy(alpha = 0.5f)
-                            fullHdrEnabled -> Color(0xFFFFB74D).copy(alpha = 0.5f)
-                            else -> Color(0x33FFFFFF)
-                        },
+                        if (fullHdrEnabled) Color(0xFFFFB74D).copy(alpha = 0.5f) else Color(0x33FFFFFF),
                         RoundedCornerShape(20.dp)
                     )
                     .padding(horizontal = 32.dp, vertical = 24.dp)
@@ -502,23 +484,16 @@ fun CameraScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     CircularProgressIndicator(
-                        color = when {
-                            burstSuperResEnabled && fullHdrEnabled -> PrismCyan
-                            burstSuperResEnabled -> PrismCyan
-                            fullHdrEnabled -> Color(0xFFFFB74D)
-                            else -> SteadyEmerald
-                        },
+                        color = if (fullHdrEnabled) Color(0xFFFFB74D) else SteadyEmerald,
                         strokeWidth = 3.5.dp,
                         modifier = Modifier.size(44.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = when {
-                            burstSuperResEnabled && fullHdrEnabled -> stringResource(R.string.fusing_super_res_hdr)
-                            burstSuperResEnabled -> stringResource(R.string.fusing_super_res)
-                            fullHdrEnabled -> stringResource(R.string.fusing_hdr)
-                            else -> stringResource(R.string.processing)
-                        },
+                        text = if (fullHdrEnabled)
+                            stringResource(R.string.fusing_full_hdr)
+                        else
+                            stringResource(R.string.processing),
                         color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
@@ -528,7 +503,7 @@ fun CameraScreen(
             }
         }
 
-        // 5. Bottom Controls (Mode Toggles + Pro Shutter Bar)
+        // ─── 6. Bottom Controls ───
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -537,14 +512,12 @@ fun CameraScreen(
                 .padding(bottom = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Secondary Controls: Mode Toggle Capsules (Curved Dewarp)
+            // Mode capsule row: Curved Dewarp
             Row(
-                modifier = Modifier
-                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Curved Dewarp Mode Capsule
                 val curveBg = if (curvedModeEnabled) SteadyEmerald.copy(alpha = 0.22f) else Color(0x770A0F1D)
                 val curveBorder = if (curvedModeEnabled) SteadyEmerald else Color(0x2EFFFFFF)
                 val curveTextColor = if (curvedModeEnabled) SteadyEmerald else Color(0xFFE2E8F0)
@@ -578,7 +551,7 @@ fun CameraScreen(
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Primary Bottom Controls Row: Symmetrical Balance & Tactile Shutter
+            // Shutter row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -586,7 +559,7 @@ fun CameraScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left: Photo Gallery Import Button (MS Lens layout)
+                // Left: Gallery import
                 Box(
                     modifier = Modifier.size(56.dp),
                     contentAlignment = Alignment.Center
@@ -610,7 +583,7 @@ fun CameraScreen(
                     }
                 }
 
-                // Center Dual-Ring Tactile Shutter Button
+                // Center: Shutter
                 Box(
                     modifier = Modifier
                         .size(86.dp)
@@ -622,19 +595,11 @@ fun CameraScreen(
                     if (isCapturing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(54.dp),
-                            color = when {
-                                burstSuperResEnabled -> PrismCyan
-                                fullHdrEnabled -> Color(0xFFFFB74D)
-                                else -> SteadyEmerald
-                            },
+                            color = if (fullHdrEnabled) Color(0xFFFFB74D) else SteadyEmerald,
                             strokeWidth = 3.5.dp
                         )
                     } else {
-                        val innerColor = when {
-                            burstSuperResEnabled -> PrismCyan
-                            fullHdrEnabled -> Color(0xFFFFB74D)
-                            else -> Color.White
-                        }
+                        val innerColor = if (fullHdrEnabled) Color(0xFFFFB74D) else Color.White
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -650,16 +615,7 @@ fun CameraScreen(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            if (burstSuperResEnabled) {
-                                Icon(
-                                    imageVector = Icons.Default.AutoAwesome,
-                                    contentDescription = stringResource(R.string.capture),
-                                    tint = Color(0xFF0F172A),
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .graphicsLayer { rotationZ = uiRotation }
-                                )
-                            } else if (fullHdrEnabled) {
+                            if (fullHdrEnabled) {
                                 Icon(
                                     imageVector = Icons.Default.HdrOn,
                                     contentDescription = stringResource(R.string.capture),
@@ -673,7 +629,7 @@ fun CameraScreen(
                     }
                 }
 
-                // Right: Document Gallery Preview Button with Count Badge
+                // Right: Document gallery with count badge
                 Box(
                     modifier = Modifier.size(56.dp),
                     contentAlignment = Alignment.Center
@@ -707,7 +663,6 @@ fun CameraScreen(
                                 )
                             }
 
-                            // Page count badge pill
                             Box(
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)

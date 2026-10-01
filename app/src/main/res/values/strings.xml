@@ -72,10 +72,11 @@
     <string name="fusing_super_res">Reconstructing 50MP Super-Res&#8230;</string>
     <string name="fusing_hdr">Synthesizing HDR Burst&#8230;</string>
     <string name="fusing_super_res_hdr">Synthesizing 50MP HDR Super-Res&#8230;</string>
-    <string name="full_hdr_title">Full HDR (Low-Level Camera2)</string>
-    <string name="full_hdr_summary">Direct Camera2 burst pipeline &amp; local tone mapping (Testing)</string>
+    <string name="fusing_full_hdr">Fusing Full HDR (1+3 Super-Res)&#8230;</string>
+    <string name="full_hdr_title">Full HDR</string>
+    <string name="full_hdr_summary">Multi-frame 1+3 super-resolution with multi-EV highlight recovery. Outputs ~50MP.</string>
     <string name="full_hdr_warning_title">Experimental Feature Warning</string>
-    <string name="full_hdr_warning_desc">This mode directly takes over low-level Camera2 capture and sensor parameters for cross-brand HDR testing. On certain devices or custom ROMs (such as LineageOS), it may cause camera HAL unresponsiveness, frame drops, or camera service crashes.\n\nIntended for testing only. Enable anyway?</string>
+    <string name="full_hdr_warning_desc">Full HDR takes over the low-level Camera2 burst pipeline to capture 4 frames at different exposures and sub-pixel offsets. May increase capture time to ~3 s and consume more power.\n\nEnable anyway?</string>
     <string name="confirm_enable">Enable</string>
     <string name="export_logs_title">Export Diagnostic Logs</string>
     <string name="export_logs_summary">Package app logs &amp; device diagnostics for feedback</string>
