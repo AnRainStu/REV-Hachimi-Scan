@@ -70,11 +70,15 @@
     <string name="burst_super_res_title">50MP Super-Res Burst</string>
     <string name="burst_super_res_summary">Sub-pixel multi-frame fusion to reconstruct 50MP detail and remove glare</string>
     <string name="fusing_super_res">Reconstructing 50MP Super-Res&#8230;</string>
+    <string name="fusing_hdr">Synthesizing HDR Burst&#8230;</string>
     <string name="full_hdr_title">Full HDR (Low-Level Camera2)</string>
     <string name="full_hdr_summary">Direct Camera2 burst pipeline &amp; local tone mapping (Testing)</string>
     <string name="full_hdr_warning_title">Experimental Feature Warning</string>
     <string name="full_hdr_warning_desc">This mode directly takes over low-level Camera2 capture and sensor parameters for cross-brand HDR testing. On certain devices or custom ROMs (such as LineageOS), it may cause camera HAL unresponsiveness, frame drops, or camera service crashes.\n\nIntended for testing only. Enable anyway?</string>
     <string name="confirm_enable">Enable</string>
+    <string name="export_logs_title">Export Diagnostic Logs</string>
+    <string name="export_logs_summary">Package app logs &amp; device diagnostics for feedback</string>
+    <string name="share_logs_title">Share Diagnostic Logs</string>
     <string name="batch_ratio">Batch Ratio</string>
     <string name="select_all">Select All</string>
     <string name="deselect_all">Deselect All</string>

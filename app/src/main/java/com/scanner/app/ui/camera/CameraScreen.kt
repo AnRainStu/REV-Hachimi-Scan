@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Collections
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.FlashOff
 import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material.icons.filled.HdrOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -86,6 +87,7 @@ fun CameraScreen(
     val detectedQuad by viewModel.detectedQuad.collectAsState()
     val curvedModeEnabled by viewModel.curvedModeEnabled.collectAsState()
     val burstSuperResEnabled by viewModel.burstSuperResEnabled.collectAsState()
+    val fullHdrEnabled by viewModel.fullHdrEnabled.collectAsState()
     val isStable by viewModel.isStable.collectAsState()
     val isCapturing by viewModel.isCapturing.collectAsState()
     val pageCount by viewModel.pageCount.collectAsState()
@@ -93,6 +95,18 @@ fun CameraScreen(
 
     LaunchedEffect(Unit) {
         viewModel.updateSettings(context)
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                viewModel.updateSettings(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     var deviceRotationDegrees by remember { mutableFloatStateOf(0f) }
@@ -176,9 +190,10 @@ fun CameraScreen(
         label = "pulseAlpha"
     )
 
-    // Shutter outer ring color based on stability & burst super-res mode
+    // Shutter outer ring color based on stability, burst super-res, or full HDR mode
     val targetRingColor = when {
         burstSuperResEnabled -> PrismCyan
+        fullHdrEnabled -> Color(0xFFFFB74D)
         isStable -> SteadyEmerald
         else -> Color.White.copy(alpha = 0.45f)
     }
@@ -188,7 +203,7 @@ fun CameraScreen(
         label = "stabilityRingColor"
     )
     val ringWidth by animateDpAsState(
-        targetValue = if (isStable || burstSuperResEnabled) 4.dp else 2.5.dp,
+        targetValue = if (isStable || burstSuperResEnabled || fullHdrEnabled) 4.dp else 2.5.dp,
         animationSpec = tween(durationMillis = 250),
         label = "ringWidth"
     )
@@ -471,7 +486,15 @@ fun CameraScreen(
                     .graphicsLayer { rotationZ = uiRotation }
                     .clip(RoundedCornerShape(20.dp))
                     .background(Color(0xE60F172A))
-                    .border(1.dp, if (burstSuperResEnabled) PrismCyan.copy(alpha = 0.5f) else Color(0x33FFFFFF), RoundedCornerShape(20.dp))
+                    .border(
+                        1.dp,
+                        when {
+                            burstSuperResEnabled -> PrismCyan.copy(alpha = 0.5f)
+                            fullHdrEnabled -> Color(0xFFFFB74D).copy(alpha = 0.5f)
+                            else -> Color(0x33FFFFFF)
+                        },
+                        RoundedCornerShape(20.dp)
+                    )
                     .padding(horizontal = 32.dp, vertical = 24.dp)
             ) {
                 Column(
@@ -479,13 +502,21 @@ fun CameraScreen(
                     verticalArrangement = Arrangement.Center
                 ) {
                     CircularProgressIndicator(
-                        color = if (burstSuperResEnabled) PrismCyan else SteadyEmerald,
+                        color = when {
+                            burstSuperResEnabled -> PrismCyan
+                            fullHdrEnabled -> Color(0xFFFFB74D)
+                            else -> SteadyEmerald
+                        },
                         strokeWidth = 3.5.dp,
                         modifier = Modifier.size(44.dp)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = if (burstSuperResEnabled) stringResource(R.string.fusing_super_res) else stringResource(R.string.processing),
+                        text = when {
+                            burstSuperResEnabled -> stringResource(R.string.fusing_super_res)
+                            fullHdrEnabled -> stringResource(R.string.fusing_hdr)
+                            else -> stringResource(R.string.processing)
+                        },
                         color = Color.White,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium,
@@ -589,11 +620,19 @@ fun CameraScreen(
                     if (isCapturing) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(54.dp),
-                            color = if (burstSuperResEnabled) PrismCyan else SteadyEmerald,
+                            color = when {
+                                burstSuperResEnabled -> PrismCyan
+                                fullHdrEnabled -> Color(0xFFFFB74D)
+                                else -> SteadyEmerald
+                            },
                             strokeWidth = 3.5.dp
                         )
                     } else {
-                        val innerColor = if (burstSuperResEnabled) PrismCyan else Color.White
+                        val innerColor = when {
+                            burstSuperResEnabled -> PrismCyan
+                            fullHdrEnabled -> Color(0xFFFFB74D)
+                            else -> Color.White
+                        }
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -612,6 +651,15 @@ fun CameraScreen(
                             if (burstSuperResEnabled) {
                                 Icon(
                                     imageVector = Icons.Default.AutoAwesome,
+                                    contentDescription = stringResource(R.string.capture),
+                                    tint = Color(0xFF0F172A),
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .graphicsLayer { rotationZ = uiRotation }
+                                )
+                            } else if (fullHdrEnabled) {
+                                Icon(
+                                    imageVector = Icons.Default.HdrOn,
                                     contentDescription = stringResource(R.string.capture),
                                     tint = Color(0xFF0F172A),
                                     modifier = Modifier

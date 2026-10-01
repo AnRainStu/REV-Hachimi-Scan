@@ -24,14 +24,44 @@ object ExifUtils {
         ExifInterface.TAG_ORIENTATION
     )
 
-    fun stampSignature(dstExif: ExifInterface) {
+    fun extractMode(exif: ExifInterface): String? {
+        val desc = exif.getAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION)
+        if (!desc.isNullOrBlank()) {
+            if (desc.contains("50MP", ignoreCase = true)) return "50MP"
+            if (desc.contains("HDR", ignoreCase = true)) return "HDR"
+            if (desc.contains("Normal", ignoreCase = true)) return "Normal"
+        }
+        val comment = exif.getAttribute(ExifInterface.TAG_USER_COMMENT)
+        if (!comment.isNullOrBlank()) {
+            if (comment.contains("50MP", ignoreCase = true)) return "50MP"
+            if (comment.contains("HDR", ignoreCase = true)) return "HDR"
+            if (comment.contains("Normal", ignoreCase = true)) return "Normal"
+        }
+        val software = exif.getAttribute(ExifInterface.TAG_SOFTWARE)
+        if (!software.isNullOrBlank()) {
+            if (software.contains("[50MP]", ignoreCase = true)) return "50MP"
+            if (software.contains("[HDR]", ignoreCase = true)) return "HDR"
+            if (software.contains("[Normal]", ignoreCase = true)) return "Normal"
+        }
+        return null
+    }
+
+    fun stampSignature(dstExif: ExifInterface, mode: String? = null) {
         try {
-            dstExif.setAttribute(ExifInterface.TAG_SOFTWARE, "HachiCam v0.1.1 (${BuildConfig.GIT_HASH})")
+            val resolvedMode = mode ?: extractMode(dstExif)
+            val modeSuffix = if (!resolvedMode.isNullOrBlank()) " [$resolvedMode]" else ""
+            dstExif.setAttribute(
+                ExifInterface.TAG_SOFTWARE,
+                "HachiCam v0.1.1 (${BuildConfig.GIT_HASH})$modeSuffix"
+            )
             dstExif.setAttribute(ExifInterface.TAG_IMAGE_UNIQUE_ID, BuildConfig.GIT_HASH)
             dstExif.setAttribute(
                 ExifInterface.TAG_USER_COMMENT,
-                "HachiCam v0.1.1 (Build: ${BuildConfig.GIT_HASH}, ${BuildConfig.BUILD_TIME})"
+                "HachiCam v0.1.1 (Build: ${BuildConfig.GIT_HASH}, ${BuildConfig.BUILD_TIME})${if (!resolvedMode.isNullOrBlank()) ", Mode: $resolvedMode" else ""}"
             )
+            if (!resolvedMode.isNullOrBlank()) {
+                dstExif.setAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION, "Capture Mode: $resolvedMode")
+            }
             if (BuildConfig.DEBUG) {
                 if (dstExif.getAttribute(ExifInterface.TAG_MAKE).isNullOrBlank()) {
                     dstExif.setAttribute(ExifInterface.TAG_MAKE, Build.MANUFACTURER)
@@ -48,18 +78,18 @@ object ExifUtils {
         }
     }
 
-    fun stampSignature(file: File) {
+    fun stampSignature(file: File, mode: String? = null) {
         if (!file.exists()) return
         try {
             val exif = ExifInterface(file.absolutePath)
-            stampSignature(exif)
+            stampSignature(exif, mode)
             exif.saveAttributes()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun copyAndStampExif(srcFile: File, dstExif: ExifInterface) {
+    fun copyAndStampExif(srcFile: File, dstExif: ExifInterface, mode: String? = null) {
         if (!srcFile.exists()) return
         try {
             val srcExif = ExifInterface(srcFile.absolutePath)
@@ -70,28 +100,29 @@ object ExifUtils {
                 }
             }
             dstExif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
-            stampSignature(dstExif)
+            val effectiveMode = mode ?: extractMode(srcExif)
+            stampSignature(dstExif, effectiveMode)
             dstExif.saveAttributes()
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun copyAndStampExif(srcFile: File, dstFile: File) {
+    fun copyAndStampExif(srcFile: File, dstFile: File, mode: String? = null) {
         if (!srcFile.exists() || !dstFile.exists()) return
         try {
             val dstExif = ExifInterface(dstFile.absolutePath)
-            copyAndStampExif(srcFile, dstExif)
+            copyAndStampExif(srcFile, dstExif, mode)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun copyAndStampExif(srcFile: File, dstFd: FileDescriptor) {
+    fun copyAndStampExif(srcFile: File, dstFd: FileDescriptor, mode: String? = null) {
         if (!srcFile.exists()) return
         try {
             val dstExif = ExifInterface(dstFd)
-            copyAndStampExif(srcFile, dstExif)
+            copyAndStampExif(srcFile, dstExif, mode)
         } catch (e: Exception) {
             e.printStackTrace()
         }
