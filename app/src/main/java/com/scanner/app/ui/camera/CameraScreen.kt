@@ -272,10 +272,10 @@ fun CameraScreen(
                             it.setSurfaceProvider(previewView.surfaceProvider)
                         }
 
-                    // Maximize quality for full sensor resolution output with Camera2 hardware ISP tuning (SPEC_11)
+                    // Low latency capture mode for rapid multi-frame burst and sub-pixel super-resolution
                     val imageCaptureBuilder = ImageCapture.Builder()
-                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
-                        .setJpegQuality(100)
+                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                        .setJpegQuality(95)
                         .setResolutionSelector(sensorResolutionSelector)
 
                     val camera2Extender = Camera2Interop.Extender(imageCaptureBuilder)
@@ -503,6 +503,7 @@ fun CameraScreen(
                 ) {
                     CircularProgressIndicator(
                         color = when {
+                            burstSuperResEnabled && fullHdrEnabled -> PrismCyan
                             burstSuperResEnabled -> PrismCyan
                             fullHdrEnabled -> Color(0xFFFFB74D)
                             else -> SteadyEmerald
@@ -513,6 +514,7 @@ fun CameraScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = when {
+                            burstSuperResEnabled && fullHdrEnabled -> stringResource(R.string.fusing_super_res_hdr)
                             burstSuperResEnabled -> stringResource(R.string.fusing_super_res)
                             fullHdrEnabled -> stringResource(R.string.fusing_hdr)
                             else -> stringResource(R.string.processing)

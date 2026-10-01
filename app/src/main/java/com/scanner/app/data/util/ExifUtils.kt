@@ -27,18 +27,21 @@ object ExifUtils {
     fun extractMode(exif: ExifInterface): String? {
         val desc = exif.getAttribute(ExifInterface.TAG_IMAGE_DESCRIPTION)
         if (!desc.isNullOrBlank()) {
+            if (desc.contains("50MP HDR", ignoreCase = true)) return "50MP HDR"
             if (desc.contains("50MP", ignoreCase = true)) return "50MP"
             if (desc.contains("HDR", ignoreCase = true)) return "HDR"
             if (desc.contains("Normal", ignoreCase = true)) return "Normal"
         }
         val comment = exif.getAttribute(ExifInterface.TAG_USER_COMMENT)
         if (!comment.isNullOrBlank()) {
+            if (comment.contains("50MP HDR", ignoreCase = true)) return "50MP HDR"
             if (comment.contains("50MP", ignoreCase = true)) return "50MP"
             if (comment.contains("HDR", ignoreCase = true)) return "HDR"
             if (comment.contains("Normal", ignoreCase = true)) return "Normal"
         }
         val software = exif.getAttribute(ExifInterface.TAG_SOFTWARE)
         if (!software.isNullOrBlank()) {
+            if (software.contains("[50MP HDR]", ignoreCase = true)) return "50MP HDR"
             if (software.contains("[50MP]", ignoreCase = true)) return "50MP"
             if (software.contains("[HDR]", ignoreCase = true)) return "HDR"
             if (software.contains("[Normal]", ignoreCase = true)) return "Normal"

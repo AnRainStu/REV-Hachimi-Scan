@@ -71,6 +71,7 @@
     <string name="burst_super_res_summary">Sub-pixel multi-frame fusion to reconstruct 50MP detail and remove glare</string>
     <string name="fusing_super_res">Reconstructing 50MP Super-Res&#8230;</string>
     <string name="fusing_hdr">Synthesizing HDR Burst&#8230;</string>
+    <string name="fusing_super_res_hdr">Synthesizing 50MP HDR Super-Res&#8230;</string>
     <string name="full_hdr_title">Full HDR (Low-Level Camera2)</string>
     <string name="full_hdr_summary">Direct Camera2 burst pipeline &amp; local tone mapping (Testing)</string>
     <string name="full_hdr_warning_title">Experimental Feature Warning</string>
