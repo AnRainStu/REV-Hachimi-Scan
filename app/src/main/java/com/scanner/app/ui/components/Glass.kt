@@ -46,6 +46,7 @@ fun GlassScaffold(
     var topHeight by remember { mutableIntStateOf(0) }
     var bottomHeight by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
+    val navigationInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     CompositionLocalProvider(LocalBackdrop provides backdrop) {
         Box(modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().onGloballyPositioned { backdrop.origin = it.positionInRoot() }
@@ -55,7 +56,7 @@ fun GlassScaffold(
                 }) {
                 GlassCanvas()
                 content(PaddingValues(top = with(density) { topHeight.toDp() },
-                    bottom = with(density) { bottomHeight.toDp() }))
+                    bottom = maxOf(navigationInset, with(density) { bottomHeight.toDp() })))
             }
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { topHeight = it.height }) { topBar() }
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { bottomHeight = it.height }) { bottomBar() }
