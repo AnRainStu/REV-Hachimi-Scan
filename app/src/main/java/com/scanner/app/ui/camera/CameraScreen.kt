@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.scanner.app.ui.components.GlassSurface
 import com.scanner.app.R
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
@@ -41,6 +42,23 @@ import java.util.concurrent.TimeUnit
 fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> Unit,
     onNavigateToSettings: () -> Unit, viewModel: CameraViewModel = viewModel()) {
     val context = LocalContext.current
+    val view = androidx.compose.ui.platform.LocalView.current
+    val window = (context as? android.app.Activity)?.window
+    DisposableEffect(window, view) {
+        val controller = window?.let { androidx.core.view.WindowCompat.getInsetsController(it, view) }
+        val oldStatus = controller?.isAppearanceLightStatusBars
+        val oldNavigation = controller?.isAppearanceLightNavigationBars
+        onDispose {
+            if (oldStatus != null) controller.isAppearanceLightStatusBars = oldStatus
+            if (oldNavigation != null) controller.isAppearanceLightNavigationBars = oldNavigation
+        }
+    }
+    SideEffect { window?.let {
+        androidx.core.view.WindowCompat.getInsetsController(it, view).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
+    } }
     val detected by viewModel.detectedQuad.collectAsStateWithLifecycle()
     val stable by viewModel.isStable.collectAsStateWithLifecycle()
     val busy by viewModel.isCapturing.collectAsStateWithLifecycle()
@@ -74,7 +92,7 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
         if (listener.canDetectOrientation()) listener.enable()
         onDispose { listener.disable() }
     }
-    Box(Modifier.fillMaxSize().background(Color(0xFF111716))) {
+    Box(Modifier.fillMaxSize().background(Color(0xFF101114))) {
         if (allowed) {
             CameraPreview(viewModel, Modifier.fillMaxSize().pointerInput(preview, busy) {
                 detectTapGestures { point ->
@@ -105,8 +123,8 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                 }) { Text(stringResource(R.string.settings)) }
             }
         }
-        Row(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Color.Black.copy(alpha = .6f))
-            .statusBarsPadding().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+        GlassSurface(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), dark = true) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onNavigateToReview, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review), tint = Color.White) }
             Text(stringResource(R.string.camera_title), color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
             IconButton(onClick = { torch = !torch; viewModel.cameraControl?.enableTorch(torch) }, enabled = allowed && !busy && viewModel.cameraInfo?.hasFlashUnit() == true) {
@@ -114,27 +132,28 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
             }
             IconButton(onClick = onNavigateToSettings, enabled = !busy) { Icon(Icons.Default.Settings, stringResource(R.string.settings), tint = Color.White) }
         }
-        Surface(Modifier.align(Alignment.BottomCenter).fillMaxWidth(), color = Color(0xF2111716), contentColor = Color.White) {
-            Column(Modifier.navigationBarsPadding().padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally,
+        }
+        GlassSurface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth(), dark = true) {
+            Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(if (stable) R.string.steady else R.string.hold_steady), style = MaterialTheme.typography.bodyMedium,
-                    color = if (stable) Color(0xFF89CBB5) else Color.White.copy(alpha = .75f))
+                    color = if (stable) Color(0xFF8BD7A9) else Color.White.copy(alpha = .75f))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = curved, onClick = viewModel::toggleCurvedMode, enabled = !busy,
                         colors = FilterChipDefaults.filterChipColors(
-                            containerColor = Color(0xFF26352E), labelColor = Color.White,
-                            selectedContainerColor = Color(0xFF325D4B), selectedLabelColor = Color.White,
+                            containerColor = Color(0xFF282A32), labelColor = Color.White,
+                            selectedContainerColor = Color(0xFF174D83), selectedLabelColor = Color.White,
                             disabledLabelColor = Color.White.copy(alpha = .45f)),
                         label = { Text(stringResource(R.string.curved_mode)) })
                     if (hdr) AssistChip(onClick = {},
-                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF26352E), labelColor = Color.White),
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF282A32), labelColor = Color.White),
                         label = { Text(stringResource(R.string.full_hdr_title)) })
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy) { Text(stringResource(R.string.import_image), color = Color.White) }
                     FilledIconButton(onClick = { viewModel.capturePhoto(context, onNavigateToCrop) },
-                        enabled = allowed && preview != null && !busy, modifier = Modifier.size(76.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color(0xFF173E33))) {
+                        enabled = allowed && preview != null && !busy, modifier = Modifier.size(76.dp).border(3.dp, Color.White.copy(alpha = .5f), CircleShape).padding(6.dp),
+                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color(0xFF1D1D1F))) {
                         if (busy) CircularProgressIndicator(Modifier.size(28.dp))
                         else Icon(Icons.Default.PhotoCamera, stringResource(R.string.capture), modifier = Modifier.size(32.dp))
                     }

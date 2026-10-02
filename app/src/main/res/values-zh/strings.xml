@@ -85,4 +85,6 @@
     <string name="ratio_width">宽度</string>
     <string name="ratio_height">高度</string>
     <string name="ratio_free">自由比例</string>
+    <string name="reduce_transparency">减少透明度</string>
+    <string name="reduce_transparency_summary">使用实色工具栏，提高文字和控件的清晰度。</string>
 </resources>

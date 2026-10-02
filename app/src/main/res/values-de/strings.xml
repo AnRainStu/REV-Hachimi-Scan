@@ -85,4 +85,6 @@
     <string name="ratio_width">Breite</string>
     <string name="ratio_height">Höhe</string>
     <string name="ratio_free">Frei</string>
+    <string name="reduce_transparency">Transparenz reduzieren</string>
+    <string name="reduce_transparency_summary">Einfarbige Werkzeugleisten für besser lesbare Texte und Bedienelemente.</string>
 </resources>

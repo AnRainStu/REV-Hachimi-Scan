@@ -24,6 +24,9 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.scanner.app.ui.components.GlassScaffold
+import com.scanner.app.ui.components.GlassTopAppBar
+import com.scanner.app.ui.components.GlassDock
 import com.scanner.app.R
 import com.scanner.app.domain.model.*
 import com.scanner.app.ui.components.AspectRatioBanner
@@ -46,17 +49,14 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
     val page = pages.find { it.id == selectedId }
     BackHandler(selecting) { selecting = false; selected.clear() }
     LaunchedEffect(pages) { selected.retainAll(pages.map { it.id }.toSet()) }
-    Scaffold(topBar = {
-        TopAppBar(title = { Text(stringResource(if (selecting) R.string.multi_select else R.string.library_title)) },
+    GlassScaffold(topBar = {
+        GlassTopAppBar(title = { Text(stringResource(if (selecting) R.string.multi_select else R.string.library_title)) },
             actions = { if (pages.isNotEmpty()) TextButton(onClick = {
                 selecting = !selecting; selected.clear()
             }, enabled = !busy) { Text(stringResource(if (selecting) R.string.cancel else R.string.multi_select)) } })
-    }, floatingActionButton = {
-        if (!selecting && pages.isNotEmpty()) ExtendedFloatingActionButton(onClick = onNavigateToCamera, icon = { Icon(Icons.Default.AddAPhoto, null) },
-            text = { Text(stringResource(R.string.camera_title)) })
     }, bottomBar = {
-        if (pages.isNotEmpty()) Surface(tonalElevation = 2.dp) {
-            Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp)) {
+        if (pages.isNotEmpty()) GlassDock() {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                 if (selecting) Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.selected_count, selected.size), modifier = Modifier.weight(1f))
                     TextButton(onClick = {
@@ -65,9 +65,14 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
                     IconButton(onClick = { batchPanel = true }, enabled = selected.isNotEmpty() && !busy) { Icon(Icons.Default.Tune, stringResource(R.string.filter)) }
                     IconButton(onClick = { deleteIds = selected.toList() }, enabled = selected.isNotEmpty() && !busy) { Icon(Icons.Default.Delete, stringResource(R.string.delete)) }
                 }
-                Button(onClick = { exportIds = if (selecting) selected.toList() else pages.map { it.id } },
-                    enabled = !busy && (!selecting || selected.isNotEmpty()), modifier = Modifier.fillMaxWidth()) {
-                    Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.export_document))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { exportIds = if (selecting) selected.toList() else pages.map { it.id } },
+                        enabled = !busy && (!selecting || selected.isNotEmpty()), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.export_document))
+                    }
+                    if (!selecting) Button(onClick = onNavigateToCamera, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.camera_title))
+                    }
                 }
             }
         }
@@ -81,12 +86,12 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
             Text(stringResource(R.string.empty_description), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
             Button(onClick = onNavigateToCamera) { Text(stringResource(R.string.camera_title)) }
-        } else LazyVerticalGrid(columns = GridCells.Adaptive(160.dp), modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 88.dp),
+        } else LazyVerticalGrid(columns = GridCells.Adaptive(160.dp), modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 24.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             item(span = { GridItemSpan(maxLineSpan) }) {
-                Column(Modifier.padding(bottom = 12.dp)) {
-                    Text(stringResource(R.string.review_title, pages.size), style = MaterialTheme.typography.headlineMedium)
+                Column(Modifier.padding(bottom = 20.dp)) {
+                    Text(stringResource(R.string.review_title, pages.size), style = MaterialTheme.typography.headlineLarge)
                     Spacer(Modifier.height(8.dp))
                     Text(stringResource(R.string.library_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -96,10 +101,12 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
                 OutlinedCard(onClick = {
                     if (selecting) { if (checked) selected.remove(item.id) else selected.add(item.id) }
                     else viewModel.selectPage(item.id)
-                }, enabled = !busy, border = BorderStroke(if (checked) 2.dp else 1.dp,
+                }, enabled = !busy, shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.outlinedCardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    border = BorderStroke(if (checked) 2.dp else .5.dp,
                     if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant)) {
                     ScanImage(item.imagePath, stringResource(R.string.page_number, index + 1),
-                        Modifier.fillMaxWidth().aspectRatio(.78f).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(12.dp), 800)
+                        Modifier.fillMaxWidth().aspectRatio(.78f).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(16.dp), 800)
                     Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.page_number, index + 1), style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                         if (selecting) Checkbox(checked, onCheckedChange = null, modifier = Modifier.padding(12.dp))
@@ -119,12 +126,12 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
     page?.let { item -> Dialog(onDismissRequest = { if (!busy) viewModel.selectPage(null) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         var zoom by remember(item.id) { mutableFloatStateOf(1f) }
         var offset by remember(item.id) { mutableStateOf(Offset.Zero) }
-        Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.page_number, pages.indexOf(item) + 1)) },
+        GlassScaffold(modifier = Modifier.fillMaxSize(), topBar = {
+            GlassTopAppBar(title = { Text(stringResource(R.string.page_number, pages.indexOf(item) + 1)) },
                 navigationIcon = { IconButton(onClick = { viewModel.selectPage(null) }, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.close)) } },
                 actions = { IconButton(onClick = { deleteIds = listOf(item.id) }, enabled = !busy) { Icon(Icons.Default.DeleteOutline, stringResource(R.string.delete)) } })
         }, bottomBar = {
-            Surface(tonalElevation = 2.dp) { Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
+            GlassDock() { Column(Modifier.padding(vertical = 12.dp)) {
                 FilterRow(item.filter, !busy) { viewModel.setPageFilter(item.id, it) }
                 AspectRatioBanner(AspectRatioPreset.fromRatio(item.targetAspectRatio), item.targetAspectRatio,
                     { if (!busy) viewModel.setPageAspectRatio(item.id, it) }, { if (!busy) viewModel.setPageCustomRatio(item.id, it) })

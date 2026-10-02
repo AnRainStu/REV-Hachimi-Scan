@@ -85,4 +85,6 @@
     <string name="ratio_width">Largeur</string>
     <string name="ratio_height">Hauteur</string>
     <string name="ratio_free">Libre</string>
+    <string name="reduce_transparency">Réduire la transparence</string>
+    <string name="reduce_transparency_summary">Utiliser des barres opaques pour améliorer la lisibilité du texte et des commandes.</string>
 </resources>

@@ -32,6 +32,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
+import com.scanner.app.ui.components.GlassScaffold
+import com.scanner.app.ui.components.GlassTopAppBar
+import com.scanner.app.ui.components.GlassDock
 import com.scanner.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,6 +70,7 @@ fun SettingsScreen(
     }
 
     var showLangDialog by remember { mutableStateOf(false) }
+    var reducedTransparency by remember { mutableStateOf(prefs.getBoolean("reduce_transparency", false)) }
     var isFullHdrEnabled by remember {
         mutableStateOf(prefs.getBoolean("full_hdr_enabled", false))
     }
@@ -74,9 +78,9 @@ fun SettingsScreen(
     val coroutineScope = rememberCoroutineScope()
     var isExportingLogs by remember { mutableStateOf(false) }
 
-    Scaffold(
+    GlassScaffold(
         topBar = {
-            TopAppBar(
+            GlassTopAppBar(
                 title = {
                     Text(
                         text = stringResource(R.string.settings),
@@ -101,6 +105,16 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            item {
+                Card(shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+                    ListItem(headlineContent = { Text(stringResource(R.string.reduce_transparency)) },
+                        supportingContent = { Text(stringResource(R.string.reduce_transparency_summary)) },
+                        trailingContent = { Switch(checked = reducedTransparency, onCheckedChange = {
+                            reducedTransparency = it
+                            prefs.edit().putBoolean("reduce_transparency", it).apply()
+                        }) })
+                }
+            }
             // General / Language Section
             item {
                 Text(

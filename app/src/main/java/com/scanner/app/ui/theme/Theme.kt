@@ -8,8 +8,8 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.*
+import com.scanner.app.ui.components.LocalReduceTransparency
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
@@ -42,9 +42,9 @@ private val LightColors = lightColorScheme(
     inverseOnSurface = md_theme_light_inverseOnSurface,
     inverseSurface = md_theme_light_inverseSurface,
     inversePrimary = md_theme_light_inversePrimary,
-    surfaceContainer = androidx.compose.ui.graphics.Color(0xFFEFF2EA),
-    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFFF1F3EC),
-    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFFE6EBE1),
+    surfaceContainer = androidx.compose.ui.graphics.Color(0xFFECEEF4),
+    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFFF2F3F7),
+    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFFE4E7EF),
 )
 
 private val DarkColors = darkColorScheme(
@@ -75,9 +75,9 @@ private val DarkColors = darkColorScheme(
     inverseOnSurface = md_theme_dark_inverseOnSurface,
     inverseSurface = md_theme_dark_inverseSurface,
     inversePrimary = md_theme_dark_inversePrimary,
-    surfaceContainer = androidx.compose.ui.graphics.Color(0xFF202B23),
-    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFF17201B),
-    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFF29362C),
+    surfaceContainer = androidx.compose.ui.graphics.Color(0xFF24252B),
+    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFF1D1D1F),
+    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFF2D2E36),
 )
 
 @Composable
@@ -86,6 +86,16 @@ fun DocScannerTheme(
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val context = LocalContext.current
+    val preferences = remember(context) { context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE) }
+    var reduced by remember(preferences) { mutableStateOf(preferences.getBoolean("reduce_transparency", false)) }
+    DisposableEffect(preferences) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == "reduce_transparency") reduced = prefs.getBoolean(key, false)
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { preferences.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
@@ -104,9 +114,9 @@ fun DocScannerTheme(
         }
     }
 
-    MaterialTheme(
+    CompositionLocalProvider(LocalReduceTransparency provides reduced) { MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
         content = content
-    )
+    ) }
 }

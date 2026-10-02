@@ -1,5 +1,13 @@
 # Refactor notes
 
+## Glass interface (0.3.0)
+
+`GlassScaffold` records the Compose content plane with `rememberGraphicsLayer`; floating navigation and docks sample that layer in their local coordinates. Only the sampled backdrop gets a GPU blur. Chrome is drawn afterwards and excluded from the recording, avoiding recursive feedback and blurred labels. Library content can scroll behind the floating controls; document cards keep opaque paper surfaces.
+
+The tint, edge highlight, rounded outline and shadow form an Apple-inspired material without copying platform assets or adding fonts. There are no continuously animated light effects or per-frame bitmap captures. Android 10/11 and the native CameraX viewfinder use a tinted fallback. Reduce transparency is persisted in settings and immediately changes all toolbars to solid surfaces; battery saver disables backdrop blur. The default Compose controls retain native focus, touch feedback and system animation scaling.
+
+CI navigates by accessibility labels/bounds and captures the library in light/dark appearances, editor, crop, export, camera, settings and opaque mode on a real Android emulator. Existing native integration and data/export tests run alongside these navigation checks. Physical-device GPU cost and OEM rendering differences remain manual checks.
+
 ## Responsibility boundaries
 
 `PageStore` owns SQLite and metadata serialization. `PageRepository` serializes writes, publishes committed state, removes superseded app-owned files and cleans abandoned drafts on startup. Missing-image records remain visible rather than silently disappearing.

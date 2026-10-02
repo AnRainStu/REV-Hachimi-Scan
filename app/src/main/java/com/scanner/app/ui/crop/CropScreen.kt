@@ -44,6 +44,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.scanner.app.ui.components.GlassScaffold
+import com.scanner.app.ui.components.GlassTopAppBar
+import com.scanner.app.ui.components.GlassDock
 import com.scanner.app.R
 import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.ImageFilter
@@ -86,9 +89,9 @@ fun CropScreen(
         title = { Text(stringResource(R.string.operation_failed)) }, text = { Text(message) },
         confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.close)) } }) }
 
-    Scaffold(
+    GlassScaffold(
         topBar = {
-            TopAppBar(
+            GlassTopAppBar(
                 title = {
                     Text(
                         text = stringResource(R.string.crop_title),
@@ -160,14 +163,11 @@ fun CropScreen(
             )
         },
         bottomBar = {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 8.dp
-            ) {
+            GlassDock() {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .navigationBarsPadding()
+                        .padding(vertical = 8.dp)
                 ) {
                     // Aspect ratio banner row directly above the filter selector
                     AspectRatioBanner(
@@ -350,7 +350,7 @@ fun CropScreen(
                     Box(contentAlignment = Alignment.Center) {
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = Color(0xEE0F172A),
+                            color = MaterialTheme.colorScheme.surface,
                             border = BorderStroke(1.dp, PrismCyan.copy(alpha = 0.5f)),
                             modifier = Modifier.padding(24.dp)
                         ) {

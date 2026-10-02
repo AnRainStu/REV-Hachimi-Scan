@@ -92,3 +92,4 @@ logo_handoff/
 
 
 .kotlin/
+__pycache__/

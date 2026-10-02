@@ -85,4 +85,6 @@
     <string name="ratio_width">Width</string>
     <string name="ratio_height">Height</string>
     <string name="ratio_free">Free</string>
+    <string name="reduce_transparency">Reduce transparency</string>
+    <string name="reduce_transparency_summary">Use solid toolbars for clearer text and controls.</string>
 </resources>

@@ -85,4 +85,6 @@
     <string name="ratio_width">幅</string>
     <string name="ratio_height">高さ</string>
     <string name="ratio_free">自由</string>
+    <string name="reduce_transparency">透明度を下げる</string>
+    <string name="reduce_transparency_summary">ツールバーを不透明にして、文字や操作ボタンを見やすくします。</string>
 </resources>

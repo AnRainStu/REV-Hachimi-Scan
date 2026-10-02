@@ -90,7 +90,7 @@ fun ExportDialog(
                     onValueChange = { exportName = it },
                     enabled = exportState !is ExportState.Exporting,
                     label = { Text(stringResource(R.string.export_name)) },
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(20.dp),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -157,7 +157,7 @@ fun ExportDialog(
                     viewModel.export(context, pages, config)
                 },
                 enabled = pages.isNotEmpty() && exportName.isNotBlank() && exportState !is ExportState.Exporting,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(20.dp)
             ) {
                 Text(stringResource(R.string.export), fontWeight = FontWeight.Bold)
             }
@@ -173,6 +173,6 @@ fun ExportDialog(
                 Text(stringResource(R.string.close))
             }
         },
-        shape = RoundedCornerShape(20.dp)
+        shape = RoundedCornerShape(28.dp)
     )
 }

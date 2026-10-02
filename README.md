@@ -6,7 +6,8 @@ Refactored offline Android document scanner based on [eviau512/Hachimi-Scan](htt
 
 ## Changes
 
-- A document library home screen with an adaptive grid, a neutral/green Material 3 theme, batch editing, ordering and deletion confirmation. Camera permission is needed only for shooting.
+- An Apple-inspired interface with floating glass navigation and editing docks, neutral surfaces, blue actions, large titles and an adaptive document grid. Batch editing, ordering and deletion confirmation remain available. Camera permission is needed only for shooting.
+- Android 12+ uses GPU backdrop blur for Compose content, with sharp text, subtle edge highlights and depth. Older Android and the CameraX viewfinder use tinted glass materials. Settings → Reduce transparency switches to solid toolbars; battery saver skips blur. Light and dark appearances follow the system.
 - SQLite transactions persist pages, crop geometry, filters, rotations and ordering. Originals live in private durable storage rather than cache.
 - Shared processing and serialized edits render new outputs from originals. Crop rotation uses a temporary draft and independent source orientation; failed edits retain the previous output.
 - Dedicated CameraX preview lifecycle, executor disposal, correct stability results and Y-plane stride handling. Final photos are detected independently of preview orientation; overlay scaling matches the viewfinder.
