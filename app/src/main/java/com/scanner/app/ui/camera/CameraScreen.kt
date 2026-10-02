@@ -118,8 +118,9 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                     .border(1.dp, Color.White, RoundedCornerShape(8.dp)))
             }
         } else {
-            Column(Modifier.fillMaxSize().padding(top = with(chromeDensity) { topChrome.toDp() },
-                bottom = with(chromeDensity) { bottomChrome.toDp() }).verticalScroll(rememberScrollState()).padding(24.dp),
+            BoxWithConstraints(Modifier.fillMaxSize().padding(top = with(chromeDensity) { topChrome.toDp() },
+                bottom = with(chromeDensity) { bottomChrome.toDp() })) {
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
                 Icon(Icons.Default.PhotoCamera, null, tint = Color.White, modifier = Modifier.size(40.dp))
@@ -129,6 +130,7 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                     context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         android.net.Uri.parse("package:${context.packageName}")))
                 }) { Text(stringResource(R.string.settings), color = Color(0xFF7AB8FF)) }
+            }
             }
         }
         GlassSurface(Modifier.align(Alignment.TopCenter).onSizeChanged { topChrome = it.height }.statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), dark = true) {
