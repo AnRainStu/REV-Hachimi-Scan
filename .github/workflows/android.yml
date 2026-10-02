@@ -61,7 +61,7 @@ jobs:
           target: google_apis
           disable-animations: true
           script: |
-            bash gradlew connectedHachimiDebugAndroidTest --console=plain
+            bash gradlew connectedHachimiDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain
             adb shell wm size 480x800
             adb shell wm density 160
             adb shell am force-stop moe.hachimi.cam
