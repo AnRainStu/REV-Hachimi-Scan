@@ -123,7 +123,7 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
             }
         }
     }
-    page?.let { item -> Dialog(onDismissRequest = { if (!busy) viewModel.selectPage(null) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    page?.let { item -> Dialog(onDismissRequest = { if (!busy) viewModel.selectPage(null) }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         var zoom by remember(item.id) { mutableFloatStateOf(1f) }
         var offset by remember(item.id) { mutableStateOf(Offset.Zero) }
         GlassScaffold(modifier = Modifier.fillMaxSize(), topBar = {

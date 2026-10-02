@@ -1,6 +1,7 @@
 """Exercise visible controls and capture the actual Android UI, using accessibility bounds."""
 import re
 import subprocess
+import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -11,16 +12,27 @@ output.mkdir(parents=True, exist_ok=True)
 def adb(*args):
     return subprocess.check_output(['adb', *args], timeout=40)
 
+def failure(kind, value, traceback):
+    (output / 'failure.png').write_bytes(adb('exec-out', 'screencap', '-p'))
+    (output / 'failure.xml').write_bytes(adb('shell', 'cat', '/sdcard/ui.xml'))
+    (output / 'crash.log').write_bytes(adb('logcat', '-d', '-s', 'AndroidRuntime'))
+    sys.__excepthook__(kind, value, traceback)
+
+sys.excepthook = failure
+
 def nodes():
     adb('shell', 'uiautomator', 'dump', '/sdcard/ui.xml')
     return ET.fromstring(adb('shell', 'cat', '/sdcard/ui.xml')).iter('node')
 
 def find(label):
-    for node in nodes():
-        if label in (node.get('text'), node.get('content-desc')):
-            bounds = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
-            if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
-                return bounds
+    visible = list(nodes())
+    # Prefer the named toolbar icon over permission help with the same text.
+    for attribute in ('content-desc', 'text'):
+        for node in visible:
+            if label == node.get(attribute):
+                bounds = list(map(int, re.findall(r'\d+', node.get('bounds', ''))))
+                if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
+                    return bounds
     raise AssertionError(f'Visible control not found: {label}')
 
 def tap(label):
@@ -45,6 +57,21 @@ def toggle_transparency(expected):
     switch = next(node for node in nodes() if node.get('checkable') == 'true')
     assert switch.get('checked') == str(expected).lower(), 'Transparency preference did not update'
 
+capture('library', 'My scans')
+# Check a compact phone viewport with enlarged system text.
+adb('shell', 'settings', 'put', 'system', 'font_scale', '1.3')
+adb('shell', 'wm', 'size', '320x640')
+time.sleep(2)
+capture('library-large-text', 'Scan')
+tap('Scan')
+capture('camera-large-text', 'Settings')
+tap('Settings')
+capture('settings-large-text', 'Reduce transparency')
+back()
+back()
+adb('shell', 'settings', 'put', 'system', 'font_scale', '1.0')
+adb('shell', 'wm', 'size', '480x800')
+time.sleep(2)
 capture('library', 'My scans')
 adb('shell', 'cmd', 'uimode', 'night', 'yes')
 time.sleep(2)

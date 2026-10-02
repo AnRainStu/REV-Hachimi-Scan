@@ -334,7 +334,7 @@ fun CropScreen(
                     onTapToSnap = { x, y ->
                         viewModel.tapToSnap(x, y)
                     },
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().padding(20.dp)
                 )
             }
 
@@ -345,7 +345,7 @@ fun CropScreen(
             ) {
                 Surface(
                     color = Color.Black.copy(alpha = 0.65f),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().padding(20.dp)
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Surface(

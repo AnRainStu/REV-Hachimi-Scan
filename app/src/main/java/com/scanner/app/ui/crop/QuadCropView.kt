@@ -117,13 +117,13 @@ fun QuadCropView(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
 
-    val handleTouchRadiusPx = with(density) { 34.dp.toPx() } // R_touch = 34dp per SPEC_06 §3.2
+    val handleTouchRadiusPx = with(density) { 34.dp.toPx() } // R_touch = 34dp per SPEC_06 搂3.2
     val strokeWidthPx = with(density) { 2.5.dp.toPx() }
     val cornerHandleRadiusPx = with(density) { 15.dp.toPx() }
     val midpointHandleRadiusPx = with(density) { 13.dp.toPx() }
     val magRadiusPx = with(density) { 54.dp.toPx() }
 
-    // Unified 8-handle interaction state (SPEC_06 §3.1)
+    // Unified 8-handle interaction state (SPEC_06 搂3.1)
     // 0: TOP_LEFT, 1: LEFT_CENTER, 2: BOTTOM_LEFT, 3: BOTTOM_CENTER,
     // 4: BOTTOM_RIGHT, 5: RIGHT_CENTER, 6: TOP_RIGHT, 7: TOP_CENTER
     var draggingHandleIndex by remember { mutableStateOf<Int?>(null) }
@@ -230,7 +230,7 @@ fun QuadCropView(
                         val sBR = imgToScreen(activeQuad.bottomRight)
                         val sBL = imgToScreen(activeQuad.bottomLeft)
 
-                        // 8-Point Equal Proximity Hit Testing (SPEC_06 §3.2)
+                        // 8-Point Equal Proximity Hit Testing (SPEC_06 搂3.2)
                         val handles = listOf(
                             sTL,                                                   // 0: TOP_LEFT
                             Offset((sTL.x + sBL.x) / 2f, (sTL.y + sBL.y) / 2f),   // 1: LEFT_CENTER
@@ -304,7 +304,7 @@ fun QuadCropView(
                         val totalDeltaY = dragTotalOffset.y / scale
 
                         if (handleIdx % 2 != 0) {
-                            // --- MIDPOINT DRAGGING (SPEC_06 §4 & §5) ---
+                            // --- MIDPOINT DRAGGING (SPEC_06 搂4 & 搂5) ---
                             // 1: Left-Center, 3: Bottom-Center, 5: Right-Center, 7: Top-Center
                             val pool = if (handleIdx == 1 || handleIdx == 5) currentVerticalLines else currentHorizontalLines
 
@@ -319,7 +319,7 @@ fun QuadCropView(
                                 (baseMid.y + totalDeltaY).coerceIn(0f, fullH)
                             )
 
-                            // Degenerate Triangle Snapping (SPEC_06 §4.1)
+                            // Degenerate Triangle Snapping (SPEC_06 搂4.1)
                             // epsilon(M, AB) = |dist(A, M) + dist(M, B) - dist(A, B)| < 5.0px
                             var bestEpsilon = Float.MAX_VALUE
                             var bestLineA: PointF? = null
@@ -346,7 +346,7 @@ fun QuadCropView(
                                 }
                             }
 
-                            // Four-Line Interception Geometry (SPEC_06 §5.1)
+                            // Four-Line Interception Geometry (SPEC_06 搂5.1)
                             val lTop = Line2D.fromPoints(baseQuad.topLeft, baseQuad.topRight)
                             val lRight = Line2D.fromPoints(baseQuad.topRight, baseQuad.bottomRight)
                             val lBottom = Line2D.fromPoints(baseQuad.bottomRight, baseQuad.bottomLeft)
@@ -400,7 +400,7 @@ fun QuadCropView(
                                 }
                             }
 
-                            // Convexity Verification (SPEC_06 §5.2)
+                            // Convexity Verification (SPEC_06 搂5.2)
                             if (isConvexQuad(tentativeQuad, fullW, fullH)) {
                                 val onQuadChangedCb = currentOnQuadChanged
                                 if (onQuadChangedCb != null) {
@@ -420,7 +420,7 @@ fun QuadCropView(
                             isEdgeSnapped = didSnap
                             activeSnapGuide = if (didSnap) SnapGuide(bestLineA!!, bestLineB!!) else null
                         } else {
-                            // --- CORNER DRAGGING (SPEC_06 §6.1) ---
+                            // --- CORNER DRAGGING (SPEC_06 搂6.1) ---
                             // 0: TOP_LEFT, 2: BOTTOM_LEFT, 4: BOTTOM_RIGHT, 6: TOP_RIGHT
                             val rawImgX = ((touchPosition.x - offsetX) / scale).coerceIn(0f, fullW)
                             val rawImgY = ((touchPosition.y - offsetY) / scale).coerceIn(0f, fullH)
@@ -511,7 +511,7 @@ fun QuadCropView(
                 val gStart = imgToScreen(guide.start)
                 val gEnd = imgToScreen(guide.end)
                 drawLine(
-                    color = Color(0xAA00E676),
+                    color = Color(0xAA34C759),
                     start = gStart,
                     end = gEnd,
                     strokeWidth = 2.dp.toPx(),
@@ -520,8 +520,8 @@ fun QuadCropView(
             }
 
             // 4. Document Border Lines with Snapping Highlights
-            val themeTeal = Color(0xFF00E5FF)
-            val snapGreen = Color(0xFF00E676)
+            val themeTeal = Color(0xFF007AFF)
+            val snapGreen = Color(0xFF34C759)
             val screenCorners = listOf(sTL, sTR, sBR, sBL)
 
             fun edgeIndexToHandle(edgeIdx: Int): Int = when (edgeIdx) {
@@ -588,7 +588,7 @@ fun QuadCropView(
 
                 val outerRadius = if (isThisEdgeDragging) midpointHandleRadiusPx + 2.dp.toPx() else midpointHandleRadiusPx
                 val borderColor = if (isThisEdgeSnapped) snapGreen else Color.White
-                val fillColor = if (isThisEdgeSnapped) snapGreen else if (isThisEdgeDragging) themeTeal else Color(0xFF003840)
+                val fillColor = if (isThisEdgeSnapped) snapGreen else if (isThisEdgeDragging) themeTeal else Color(0xFF163C66)
 
                 // Drop shadow
                 drawCircle(
@@ -641,7 +641,7 @@ fun QuadCropView(
                 drawCircle(color = Color.White, radius = cornerHandleRadiusPx * 0.35f, center = corner)
             }
 
-            // 7. High-Precision Magnifier Loupe with Center Crosshair (SPEC_06 §6)
+            // 7. High-Precision Magnifier Loupe with Center Crosshair (SPEC_06 搂6)
             // Visible exclusively when dragging a corner handle (0, 2, 4, 6); hidden on midpoint drags.
             val activeCornerImg = when (draggingHandleIndex) {
                 0 -> quad.topLeft
