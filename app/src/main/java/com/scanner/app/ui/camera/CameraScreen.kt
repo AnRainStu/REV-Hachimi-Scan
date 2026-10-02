@@ -11,6 +11,8 @@ import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -23,6 +25,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -42,6 +45,9 @@ import java.util.concurrent.TimeUnit
 fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> Unit,
     onNavigateToSettings: () -> Unit, viewModel: CameraViewModel = viewModel()) {
     val context = LocalContext.current
+    val chromeDensity = LocalDensity.current
+    var topChrome by remember { mutableIntStateOf(0) }
+    var bottomChrome by remember { mutableIntStateOf(0) }
     val view = androidx.compose.ui.platform.LocalView.current
     val window = (context as? android.app.Activity)?.window
     DisposableEffect(window, view) {
@@ -112,18 +118,20 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                     .border(1.dp, Color.White, RoundedCornerShape(8.dp)))
             }
         } else {
-            Column(Modifier.align(Alignment.Center).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Column(Modifier.fillMaxSize().padding(top = with(chromeDensity) { topChrome.toDp() },
+                bottom = with(chromeDensity) { bottomChrome.toDp() }).verticalScroll(rememberScrollState()).padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
                 Icon(Icons.Default.PhotoCamera, null, tint = Color.White, modifier = Modifier.size(40.dp))
                 Text(stringResource(R.string.camera_permission_required), color = Color.White)
                 Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.grant_permission)) }
                 TextButton(onClick = {
                     context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         android.net.Uri.parse("package:${context.packageName}")))
-                }) { Text(stringResource(R.string.settings)) }
+                }) { Text(stringResource(R.string.settings), color = Color(0xFF7AB8FF)) }
             }
         }
-        GlassSurface(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), dark = true) {
+        GlassSurface(Modifier.align(Alignment.TopCenter).onSizeChanged { topChrome = it.height }.statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), dark = true) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onNavigateToReview, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review), tint = Color.White) }
             Text(stringResource(R.string.camera_title), color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
@@ -133,7 +141,7 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
             IconButton(onClick = onNavigateToSettings, enabled = !busy) { Icon(Icons.Default.Settings, stringResource(R.string.settings), tint = Color.White) }
         }
         }
-        GlassSurface(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth(), dark = true) {
+        GlassSurface(Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomChrome = it.height }.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth(), dark = true) {
             Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(stringResource(if (stable) R.string.steady else R.string.hold_steady), style = MaterialTheme.typography.bodyMedium,

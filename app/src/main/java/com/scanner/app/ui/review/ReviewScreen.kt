@@ -47,8 +47,11 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
     var deleteIds by remember { mutableStateOf<List<String>?>(null) }
     var batchPanel by remember { mutableStateOf(false) }
     val page = pages.find { it.id == selectedId }
+    val libraryGridState = rememberLazyGridState()
     BackHandler(selecting) { selecting = false; selected.clear() }
     LaunchedEffect(pages) { selected.retainAll(pages.map { it.id }.toSet()) }
+    Box(Modifier.fillMaxSize()) {
+    if (page == null) {
     GlassScaffold(topBar = {
         GlassTopAppBar(title = { Text(stringResource(if (selecting) R.string.multi_select else R.string.library_title)) },
             actions = { if (pages.isNotEmpty()) TextButton(onClick = {
@@ -68,7 +71,7 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { exportIds = if (selecting) selected.toList() else pages.map { it.id } },
                         enabled = !busy && (!selecting || selected.isNotEmpty()), modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.export_document))
+                        Icon(Icons.Default.IosShare, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.export))
                     }
                     if (!selecting) Button(onClick = onNavigateToCamera, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
                         Icon(Icons.Default.AddAPhoto, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.camera_title))
@@ -86,7 +89,7 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
             Text(stringResource(R.string.empty_description), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
             Button(onClick = onNavigateToCamera) { Text(stringResource(R.string.camera_title)) }
-        } else LazyVerticalGrid(columns = GridCells.Adaptive(160.dp), modifier = Modifier.fillMaxSize(),
+        } else LazyVerticalGrid(columns = GridCells.Adaptive(160.dp), state = libraryGridState, modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = padding.calculateTopPadding() + 24.dp, bottom = padding.calculateBottomPadding() + 24.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -116,6 +119,7 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
             }
         }
     }
+    }
     if (busy) Dialog(onDismissRequest = {}, properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)) {
         Surface(shape = RoundedCornerShape(24.dp)) {
             Row(Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -123,7 +127,8 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
             }
         }
     }
-    page?.let { item -> Dialog(onDismissRequest = { if (!busy) viewModel.selectPage(null) }, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
+    page?.let { item -> Box(Modifier.fillMaxSize()) {
+        BackHandler { if (!busy) viewModel.selectPage(null) }
         var zoom by remember(item.id) { mutableFloatStateOf(1f) }
         var offset by remember(item.id) { mutableStateOf(Offset.Zero) }
         GlassScaffold(modifier = Modifier.fillMaxSize(), topBar = {
@@ -173,6 +178,7 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
     exportIds?.let { ids -> ExportDialog(pages.filter { it.id in ids }, { exportIds = null }) }
     error?.let { message -> AlertDialog(onDismissRequest = viewModel::dismissError, title = { Text(stringResource(R.string.operation_failed)) }, text = { Text(message) },
         confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.close)) } }) }
+    }
 }
 
 @Composable
