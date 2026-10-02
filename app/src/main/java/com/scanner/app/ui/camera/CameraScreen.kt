@@ -121,8 +121,14 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                     color = if (stable) Color(0xFF89CBB5) else Color.White.copy(alpha = .75f))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(selected = curved, onClick = viewModel::toggleCurvedMode, enabled = !busy,
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color(0xFF26352E), labelColor = Color.White,
+                            selectedContainerColor = Color(0xFF325D4B), selectedLabelColor = Color.White,
+                            disabledLabelColor = Color.White.copy(alpha = .45f)),
                         label = { Text(stringResource(R.string.curved_mode)) })
-                    if (hdr) AssistChip(onClick = {}, label = { Text(stringResource(R.string.full_hdr_title)) })
+                    if (hdr) AssistChip(onClick = {},
+                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF26352E), labelColor = Color.White),
+                        label = { Text(stringResource(R.string.full_hdr_title)) })
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy) { Text(stringResource(R.string.import_image), color = Color.White) }

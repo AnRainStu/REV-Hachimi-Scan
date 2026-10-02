@@ -52,7 +52,7 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
                 selecting = !selecting; selected.clear()
             }, enabled = !busy) { Text(stringResource(if (selecting) R.string.cancel else R.string.multi_select)) } })
     }, floatingActionButton = {
-        if (!selecting) ExtendedFloatingActionButton(onClick = onNavigateToCamera, icon = { Icon(Icons.Default.AddAPhoto, null) },
+        if (!selecting && pages.isNotEmpty()) ExtendedFloatingActionButton(onClick = onNavigateToCamera, icon = { Icon(Icons.Default.AddAPhoto, null) },
             text = { Text(stringResource(R.string.camera_title)) })
     }, bottomBar = {
         if (pages.isNotEmpty()) Surface(tonalElevation = 2.dp) {
