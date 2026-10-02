@@ -10,6 +10,7 @@ import java.util.Locale
 class ScannerApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        com.scanner.app.data.repository.PageRepository.initialize(this)
         // Initialize OpenCV
         OpenCVLoader.initLocal()
 

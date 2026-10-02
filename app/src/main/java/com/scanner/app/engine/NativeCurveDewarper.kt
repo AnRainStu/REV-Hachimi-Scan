@@ -17,6 +17,7 @@ class NativeCurveDewarper {
         val rightArr = boundary.rightCurve.toFloatArray()
         
         val resultMatAddr = nativeDewarpCurved(srcMat.nativeObjAddr, topArr, bottomArr, leftArr, rightArr)
+        check(resultMatAddr != 0L) { "Native processing failed" }
         return Mat(resultMatAddr)
     }
 

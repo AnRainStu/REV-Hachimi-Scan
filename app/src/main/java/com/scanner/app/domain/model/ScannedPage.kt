@@ -10,6 +10,7 @@ data class ScannedPage(
     val quad: DocumentQuad? = null,
     val curvedBoundary: CurvedBoundary? = null,
     val filter: ImageFilter = ImageFilter.MAGIC_COLOR,
+    val sourceRotation: Int = 0,
     val rotation: Int = 0, // 0, 90, 180, 270
     val targetAspectRatio: Float? = null,
     val createdAt: Long = System.currentTimeMillis()

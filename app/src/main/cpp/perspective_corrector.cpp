@@ -52,6 +52,15 @@ cv::Mat PerspectiveCorrector::correctPerspective(const cv::Mat& src, const std::
         }
     }
 
+    // Keep extreme ratios and high-resolution captures inside a bounded allocation.
+    constexpr double pixelBudget = 50000000.0;
+    double outputPixels = static_cast<double>(maxWidth) * maxHeight;
+    if (outputPixels > pixelBudget) {
+        double scale = std::sqrt(pixelBudget / outputPixels);
+        maxWidth = std::max(10, static_cast<int>(maxWidth * scale));
+        maxHeight = std::max(10, static_cast<int>(maxHeight * scale));
+    }
+
     std::vector<cv::Point2f> dstCorners = {
         cv::Point2f(0.0f, 0.0f),
         cv::Point2f(static_cast<float>(maxWidth - 1), 0.0f),

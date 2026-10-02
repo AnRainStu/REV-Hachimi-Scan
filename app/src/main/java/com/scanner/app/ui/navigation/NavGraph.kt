@@ -27,12 +27,12 @@ sealed class Screen(val route: String) {
 fun DocScannerNavGraph(navController: NavHostController) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Camera.route,
+        startDestination = Screen.Review.route,
         modifier = Modifier.fillMaxSize()
     ) {
         composable(Screen.Camera.route) {
             CameraScreen(
-                onNavigateToReview = { navController.navigate(Screen.Review.route) },
+                onNavigateToReview = { navController.popBackStack(Screen.Review.route, false) },
                 onNavigateToCrop = { pageId -> navController.navigate(Screen.Crop.createRoute(pageId)) },
                 onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
@@ -47,7 +47,8 @@ fun DocScannerNavGraph(navController: NavHostController) {
                 pageId = pageId,
                 onConfirm = {
                     navController.navigate(Screen.Review.route) {
-                        popUpTo(Screen.Camera.route)
+                        popUpTo(Screen.Review.route)
+                        launchSingleTop = true
                     }
                 },
                 onCancel = { navController.popBackStack() }
@@ -58,7 +59,7 @@ fun DocScannerNavGraph(navController: NavHostController) {
             ReviewScreen(
                 onNavigateToCamera = {
                     navController.navigate(Screen.Camera.route) {
-                        popUpTo(Screen.Camera.route) { inclusive = true }
+                        launchSingleTop = true
                     }
                 },
                 onNavigateToCrop = { pageId -> navController.navigate(Screen.Crop.createRoute(pageId)) }

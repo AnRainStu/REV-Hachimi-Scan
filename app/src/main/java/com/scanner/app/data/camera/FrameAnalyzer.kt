@@ -13,7 +13,7 @@ import kotlin.math.max
 
 class FrameAnalyzer(
     private val detector: NativeEdgeDetector,
-    var curvedMode: Boolean = false,
+    @Volatile var curvedMode: Boolean = false,
     private val onResult: (DetectionResult) -> Unit
 ) : ImageAnalysis.Analyzer {
 
@@ -25,14 +25,16 @@ class FrameAnalyzer(
     private val recentQuads = ArrayDeque<FrameQuadRecord>(5)
     private var stableSinceMs: Long = 0L
 
-    var touchPoint: android.graphics.PointF? = null
+    @Volatile var touchPoint: android.graphics.PointF? = null
 
-    fun resetStability() {
+    @Synchronized fun resetStability() {
         recentQuads.clear()
         stableSinceMs = 0L
     }
 
-    override fun analyze(imageProxy: ImageProxy) {
+    @Synchronized override fun analyze(imageProxy: ImageProxy) {
+        var gray: Mat? = null
+        var rotated: Mat? = null
         try {
             val yPlane = imageProxy.planes[0]
             val yBuffer = yPlane.buffer
@@ -41,22 +43,19 @@ class FrameAnalyzer(
             val width = imageProxy.width
             val height = imageProxy.height
 
-            val grayMat = Mat(height, width, CvType.CV_8UC1)
-            if (rowStride == width && pixelStride == 1) {
-                val yBytes = ByteArray(width * height)
-                yBuffer.get(yBytes)
-                grayMat.put(0, 0, yBytes)
-            } else {
-                val rowData = ByteArray(width)
-                for (row in 0 until height) {
-                    yBuffer.position(row * rowStride)
-                    yBuffer.get(rowData, 0, width)
-                    grayMat.put(row, 0, rowData)
+            val grayMat = Mat(height, width, CvType.CV_8UC1).also { gray = it }
+            val yBytes = ByteArray(width * height)
+            val source = yBuffer.duplicate()
+            val start = source.position()
+            for (row in 0 until height) {
+                for (column in 0 until width) {
+                    yBytes[row * width + column] = source.get(start + row * rowStride + column * pixelStride)
                 }
             }
-            
+            grayMat.put(0, 0, yBytes)
+
             val rotationDegrees = imageProxy.imageInfo.rotationDegrees
-            val rotatedMat = Mat()
+            val rotatedMat = Mat().also { rotated = it }
             
             if (rotationDegrees == 90 || rotationDegrees == 270) {
                 Core.transpose(grayMat, rotatedMat)
@@ -123,9 +122,13 @@ class FrameAnalyzer(
             val finalResult = result.copy(isStable = isStable)
             onResult(finalResult)
 
-            grayMat.release()
-            rotatedMat.release()
+
+        } catch (e: Exception) {
+            resetStability()
+            onResult(DetectionResult(found = false, isCurved = false, quad = null, boundaryPoints = null,
+                frameWidth = imageProxy.width, frameHeight = imageProxy.height))
         } finally {
+            gray?.release(); rotated?.release()
             imageProxy.close()
         }
     }

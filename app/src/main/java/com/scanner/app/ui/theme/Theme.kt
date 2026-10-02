@@ -42,6 +42,9 @@ private val LightColors = lightColorScheme(
     inverseOnSurface = md_theme_light_inverseOnSurface,
     inverseSurface = md_theme_light_inverseSurface,
     inversePrimary = md_theme_light_inversePrimary,
+    surfaceContainer = androidx.compose.ui.graphics.Color(0xFFEFF2EA),
+    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFFF1F3EC),
+    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFFE6EBE1),
 )
 
 private val DarkColors = darkColorScheme(
@@ -72,6 +75,9 @@ private val DarkColors = darkColorScheme(
     inverseOnSurface = md_theme_dark_inverseOnSurface,
     inverseSurface = md_theme_dark_inverseSurface,
     inversePrimary = md_theme_dark_inversePrimary,
+    surfaceContainer = androidx.compose.ui.graphics.Color(0xFF202B23),
+    surfaceContainerLow = androidx.compose.ui.graphics.Color(0xFF17201B),
+    surfaceContainerHigh = androidx.compose.ui.graphics.Color(0xFF29362C),
 )
 
 @Composable

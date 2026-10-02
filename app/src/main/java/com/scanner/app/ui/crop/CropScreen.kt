@@ -68,7 +68,6 @@ fun CropScreen(
 
     val currentQuad by viewModel.currentQuad.collectAsState()
     val detectedQuad by viewModel.detectedQuad.collectAsState()
-    val edgeMatAddr by viewModel.edgeMatAddr.collectAsState()
     val horizontalLines by viewModel.horizontalLines.collectAsState()
     val verticalLines by viewModel.verticalLines.collectAsState()
     val selectedFilter by viewModel.selectedFilter.collectAsState()
@@ -76,11 +75,16 @@ fun CropScreen(
     val customRatioValue by viewModel.customRatioValue.collectAsState()
     val imagePath by viewModel.imagePath.collectAsState()
     val imageVersion by viewModel.imageVersion.collectAsState()
+    val error by viewModel.error.collectAsState()
     var isSaving by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
     val rotationAngle = remember { Animatable(0f) }
     var isRotating by remember { mutableStateOf(false) }
+
+    error?.let { message -> AlertDialog(onDismissRequest = viewModel::dismissError,
+        title = { Text(stringResource(R.string.operation_failed)) }, text = { Text(message) },
+        confirmButton = { TextButton(onClick = viewModel::dismissError) { Text(stringResource(R.string.close)) } }) }
 
     Scaffold(
         topBar = {
@@ -89,7 +93,7 @@ fun CropScreen(
                     Text(
                         text = stringResource(R.string.crop_title),
                         fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 },
                 navigationIcon = {
@@ -97,7 +101,7 @@ fun CropScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.cancel),
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 },
@@ -126,7 +130,7 @@ fun CropScreen(
                         Icon(
                             imageVector = Icons.Default.Refresh,
                             contentDescription = stringResource(R.string.rotate_90),
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     IconButton(
@@ -136,7 +140,7 @@ fun CropScreen(
                         Icon(
                             imageVector = Icons.Default.CropFree,
                             contentDescription = stringResource(R.string.full_image),
-                            tint = Color.White
+                            tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
                     IconButton(
@@ -151,13 +155,13 @@ fun CropScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0F172A)
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         },
         bottomBar = {
             Surface(
-                color = Color(0xFF0F172A),
+                color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 8.dp
             ) {
                 Column(
@@ -175,7 +179,7 @@ fun CropScreen(
                     )
 
                     HorizontalDivider(
-                        color = Color(0x1FFFFFFF),
+                        color = MaterialTheme.colorScheme.outlineVariant,
                         thickness = 0.5.dp,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
@@ -226,22 +230,22 @@ fun CropScreen(
                             enabled = !isSaving && !isRotating,
                             onClick = {
                                 isSaving = true
-                                viewModel.confirmCrop {
+                                viewModel.confirmCrop { success ->
                                     isSaving = false
-                                    onConfirm()
+                                    if (success) onConfirm()
                                 }
                             },
                             shape = RoundedCornerShape(16.dp),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = SteadyEmerald,
-                                contentColor = Color(0xFF0F172A)
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                         ) {
                             if (isSaving) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(18.dp),
-                                    color = Color(0xFF0F172A),
+                                    color = MaterialTheme.colorScheme.surface,
                                     strokeWidth = 2.dp
                                 )
                             } else {
@@ -267,20 +271,18 @@ fun CropScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFF0A0F1D))
+                .background(MaterialTheme.colorScheme.background)
         ) {
             val containerW = constraints.maxWidth.toFloat()
             val containerH = constraints.maxHeight.toFloat()
 
-            val (origW, origH) = remember(imagePath, imageVersion) {
-                imagePath?.let { getUprightDimensions(it) } ?: Pair(0f, 0f)
-            }
-
-            val bitmap = remember(imagePath, imageVersion) {
-                imagePath?.let { path ->
-                    loadUprightBitmap(path)
+            val preview by produceState<Pair<Pair<Float, Float>, Bitmap?>?>(null, imagePath, imageVersion) {
+                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    imagePath?.let { getUprightDimensions(it) to loadUprightBitmap(it) }
                 }
             }
+            val (origW, origH) = preview?.first ?: Pair(0f, 0f)
+            val bitmap = preview?.second
 
             LaunchedEffect(bitmap) {
                 if (bitmap != null) {
@@ -316,7 +318,6 @@ fun CropScreen(
                     bitmap = bitmap,
                     quad = currentQuad,
                     detectedQuad = detectedQuad,
-                    edgeMatAddr = edgeMatAddr,
                     horizontalLines = horizontalLines,
                     verticalLines = verticalLines,
                     originalWidth = origW,
@@ -365,7 +366,7 @@ fun CropScreen(
                                 )
                                 Text(
                                     text = stringResource(R.string.processing),
-                                    color = Color.White,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -378,69 +379,10 @@ fun CropScreen(
 }
 
 @Composable
-private fun RatioChip(
-    label: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val bg = if (isSelected) PrismCyan.copy(alpha = 0.25f) else Color(0x22FFFFFF)
-    val border = if (isSelected) PrismCyan else Color(0x22FFFFFF)
-    val contentColor = if (isSelected) PrismCyan else Color(0xFFE2E8F0)
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 6.dp)
-    ) {
-        Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-            color = contentColor
-        )
-    }
-}
-
-@Composable
-private fun CropFilterChip(
-    label: String,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    val bg = if (isSelected) PrismCyan.copy(alpha = 0.25f) else Color(0x22FFFFFF)
-    val border = if (isSelected) PrismCyan else Color(0x22FFFFFF)
-    val contentColor = if (isSelected) PrismCyan else Color(0xFFE2E8F0)
-
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(bg)
-            .border(1.dp, border, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 7.dp)
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(5.dp)
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(15.dp),
-                tint = contentColor
-            )
-            Text(
-                text = label,
-                fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                color = contentColor
-            )
-        }
-    }
+private fun CropFilterChip(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isSelected: Boolean, onClick: () -> Unit) {
+    FilterChip(selected = isSelected, onClick = onClick,
+        label = { Text(label) }, leadingIcon = { Icon(icon, null, Modifier.size(16.dp)) })
 }
 
 private fun getUprightDimensions(path: String): Pair<Float, Float> {

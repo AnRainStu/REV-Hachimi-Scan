@@ -35,11 +35,14 @@ fun EdgeOverlay(
     var targetP2 by remember { mutableStateOf(Offset.Zero) }
     var targetP3 by remember { mutableStateOf(Offset.Zero) }
 
+    LaunchedEffect(points, isFound) {
     if (isFound && points.size >= 4) {
         targetP0 = Offset(points[0].x, points[0].y)
         targetP1 = Offset(points[1].x, points[1].y)
         targetP2 = Offset(points[2].x, points[2].y)
         targetP3 = Offset(points[3].x, points[3].y)
+    }
+
     }
 
     val animP0 by animateOffsetAsState(targetValue = targetP0, animationSpec = tween(durationMillis = 70), label = "p0")
@@ -49,14 +52,14 @@ fun EdgeOverlay(
 
     if (animatedAlpha <= 0.01f) return
 
-    val strokeColor = if (isCurvedMode) Color(0xFF00B0FF) else Color(0xFF00E676)
+    val strokeColor = if (isCurvedMode) Color(0xFF89CBB5) else Color(0xFF89CBB5)
     val cornerColor = Color.White
 
     Canvas(modifier = modifier.fillMaxSize()) {
         val frameW = if (detectionResult.frameWidth > 0) detectionResult.frameWidth.toFloat() else size.width
         val frameH = if (detectionResult.frameHeight > 0) detectionResult.frameHeight.toFloat() else size.height
 
-        val scale = maxOf(size.width / frameW, size.height / frameH)
+        val scale = minOf(size.width / frameW, size.height / frameH)
         val offsetX = (size.width - frameW * scale) / 2f
         val offsetY = (size.height - frameH * scale) / 2f
 

@@ -37,8 +37,10 @@ fun ExportDialog(
         mutableStateOf(format.format(Date()))
     }
 
+    LaunchedEffect(Unit) { viewModel.resetState() }
+
     AlertDialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = { if (exportState !is ExportState.Exporting) onDismiss() },
         title = {
             Text(
                 text = stringResource(R.string.export_document),
@@ -86,6 +88,7 @@ fun ExportDialog(
                 OutlinedTextField(
                     value = exportName,
                     onValueChange = { exportName = it },
+                    enabled = exportState !is ExportState.Exporting,
                     label = { Text(stringResource(R.string.export_name)) },
                     shape = RoundedCornerShape(12.dp),
                     singleLine = true,
@@ -113,8 +116,23 @@ fun ExportDialog(
                         }
                     }
                     is ExportState.Success -> {
+                        TextButton(onClick = {
+                            val intent = android.content.Intent(
+                                if (state.result.uris.size == 1) android.content.Intent.ACTION_SEND
+                                else android.content.Intent.ACTION_SEND_MULTIPLE
+                            ).apply {
+                                type = state.result.mimeType
+                                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                clipData = android.content.ClipData.newUri(context.contentResolver, "Scanned document", state.result.uris.first()).apply {
+                                    state.result.uris.drop(1).forEach { addItem(android.content.ClipData.Item(it)) }
+                                }
+                                if (state.result.uris.size == 1) putExtra(android.content.Intent.EXTRA_STREAM, state.result.uris.first())
+                                else putParcelableArrayListExtra(android.content.Intent.EXTRA_STREAM, ArrayList(state.result.uris))
+                            }
+                            context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.export)))
+                        }) { Text(stringResource(R.string.share)) }
                         Text(
-                            text = stringResource(R.string.export_success, state.path),
+                            text = stringResource(R.string.export_success, state.result.location),
                             color = MaterialTheme.colorScheme.primary,
                             style = MaterialTheme.typography.bodySmall,
                             fontWeight = FontWeight.Medium
@@ -138,7 +156,7 @@ fun ExportDialog(
                     val config = ExportConfig(exportMode = selectedMode, name = exportName)
                     viewModel.export(context, pages, config)
                 },
-                enabled = exportState !is ExportState.Exporting,
+                enabled = pages.isNotEmpty() && exportName.isNotBlank() && exportState !is ExportState.Exporting,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(stringResource(R.string.export), fontWeight = FontWeight.Bold)
@@ -146,6 +164,7 @@ fun ExportDialog(
         },
         dismissButton = {
             TextButton(
+                enabled = exportState !is ExportState.Exporting,
                 onClick = {
                     viewModel.resetState()
                     onDismiss()

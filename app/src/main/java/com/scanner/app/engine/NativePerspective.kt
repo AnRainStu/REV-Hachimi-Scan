@@ -12,6 +12,7 @@ class NativePerspective {
 
     fun correctPerspective(srcMat: Mat, corners: DocumentQuad, targetAspectRatio: Float = 0f): Mat {
         val resultMatAddr = nativeCorrectPerspective(srcMat.nativeObjAddr, corners.toFloatArray(), targetAspectRatio)
+        check(resultMatAddr != 0L) { "Native processing failed" }
         return Mat(resultMatAddr)
     }
 
@@ -23,6 +24,7 @@ class NativePerspective {
             ImageFilter.GRAYSCALE -> 3
         }
         val resultMatAddr = nativeProcessDocument(srcMat.nativeObjAddr, corners.toFloatArray(), filterId, targetAspectRatio)
+        check(resultMatAddr != 0L) { "Native processing failed" }
         return Mat(resultMatAddr)
     }
 
@@ -34,6 +36,7 @@ class NativePerspective {
             ImageFilter.GRAYSCALE -> 3
         }
         val resultMatAddr = nativeApplyFilter(srcMat.nativeObjAddr, filterId)
+        check(resultMatAddr != 0L) { "Native processing failed" }
         return Mat(resultMatAddr)
     }
 

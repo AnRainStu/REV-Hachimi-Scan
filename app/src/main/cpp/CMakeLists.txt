@@ -25,5 +25,5 @@ target_link_libraries(
         OpenCV::opencv_java4
 )
 
-target_compile_options(doc_scanner_engine PRIVATE -O3 -ffast-math -fopenmp)
+target_compile_options(doc_scanner_engine PRIVATE -O3 -fopenmp)
 target_link_options(doc_scanner_engine PRIVATE -fopenmp -static-openmp)

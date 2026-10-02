@@ -104,7 +104,6 @@ fun QuadCropView(
     bitmap: Bitmap?,
     quad: DocumentQuad,
     detectedQuad: DocumentQuad? = null,
-    edgeMatAddr: Long = 0L,
     horizontalLines: FloatArray = FloatArray(0),
     verticalLines: FloatArray = FloatArray(0),
     originalWidth: Float = 0f,

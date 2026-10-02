@@ -50,6 +50,11 @@ import kotlin.coroutines.resume
  */
 class CameraViewModel : ViewModel() {
 
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
+    fun reportError(message: String) { _error.value = message }
+    fun dismissError() { _error.value = null }
+
     private val _detectedQuad = MutableStateFlow<DetectionResult?>(null)
     val detectedQuad: StateFlow<DetectionResult?> = _detectedQuad.asStateFlow()
 
@@ -100,7 +105,7 @@ class CameraViewModel : ViewModel() {
     fun onFrameAnalyzed(result: DetectionResult) {
         val prev = _detectedQuad.value
         val newQuad = result.quad
-        val isStableFrame = result.found
+        val isStableFrame = result.isStable
 
         _isStable.value = isStableFrame
 
@@ -163,41 +168,23 @@ class CameraViewModel : ViewModel() {
 
     private fun captureSinglePhoto(context: Context, capture: ImageCapture, onPageSaved: (String) -> Unit) {
         _isCapturing.value = true
-        val photoFile = File(context.cacheDir, "${UUID.randomUUID()}.jpg")
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-        val executor = ContextCompat.getMainExecutor(context)
-
-        capture.takePicture(
-            outputOptions,
-            executor,
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    viewModelScope.launch(Dispatchers.Default) {
-                        val (photoW, photoH) = normalizeExifOrientation(photoFile)
-                        ExifUtils.stampSignature(photoFile, mode = "Normal")
-                        val currentResult = _detectedQuad.value
-                        val finalQuad = computeTargetQuad(currentResult, photoW, photoH)
-
-                        val newPage = ScannedPage(
-                            id = UUID.randomUUID().toString(),
-                            originalImagePath = photoFile.absolutePath,
-                            quad = finalQuad,
-                            filter = ImageFilter.MAGIC_COLOR
-                        )
-                        PageRepository.addPage(newPage)
-                        withContext(Dispatchers.Main) {
-                            _isCapturing.value = false
-                            onPageSaved(newPage.id)
-                        }
-                    }
+        viewModelScope.launch {
+            val photoFile = File(com.scanner.app.data.image.ImageStorage(context).getStorageDir(), "${UUID.randomUUID()}.jpg")
+            var saved = false
+            try {
+                check(takeSinglePicture(capture, context, photoFile)) { "Capture failed" }
+                val page = withContext(Dispatchers.IO) {
+                    val (w, h) = normalizeExifOrientation(photoFile)
+                    ExifUtils.stampSignature(photoFile, mode = "Normal")
+                    ScannedPage(originalImagePath = photoFile.absolutePath,
+                        quad = detectSavedQuad(photoFile, w, h)).also(PageRepository::addPage)
                 }
-
-                override fun onError(exception: ImageCaptureException) {
-                    exception.printStackTrace()
-                    _isCapturing.value = false
-                }
-            }
-        )
+                saved = true
+                onPageSaved(page.id)
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { reportError(e.message ?: "Capture failed") }
+            finally { _isCapturing.value = false; if (!saved && PageRepository.pages.value.none { it.originalImagePath == photoFile.absolutePath }) photoFile.delete() }
+        }
     }
 
     // ─────────────────────────────────────────────
@@ -218,6 +205,9 @@ class CameraViewModel : ViewModel() {
             _isCapturing.value = true
             val control = cameraControl
             val info = cameraInfo
+            val tempFiles = mutableListOf<File>()
+            val finalPhotoFile = File(com.scanner.app.data.image.ImageStorage(context).getStorageDir(), "${UUID.randomUUID()}.jpg")
+            var saved = false
             try {
                 // Wait for stable frame before burst (up to 1.5s)
                 if (!_isStable.value) {
@@ -238,13 +228,11 @@ class CameraViewModel : ViewModel() {
                     minIndex.coerceAtMost(0)
                 }
 
-                val tempFiles = mutableListOf<File>()
 
                 // Frame 0: EV 0 — base frame
                 val file0 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_0.jpg")
-                if (takeSinglePicture(capture, context, file0) && file0.exists() && file0.length() > 0) {
-                    tempFiles.add(file0)
-                }
+                tempFiles.add(file0)
+                check(takeSinglePicture(capture, context, file0) && file0.length() > 0) { "HDR frame 1 failed" }
 
                 // Frame 1: EV targetHighlightIndex — highlight recovery
                 if (targetHighlightIndex < 0 && control != null) {
@@ -252,9 +240,8 @@ class CameraViewModel : ViewModel() {
                     delay(50)
                 }
                 val file1 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_1.jpg")
-                if (takeSinglePicture(capture, context, file1) && file1.exists() && file1.length() > 0) {
-                    tempFiles.add(file1)
-                }
+                tempFiles.add(file1)
+                check(takeSinglePicture(capture, context, file1) && file1.length() > 0) { "HDR frame 2 failed" }
 
                 // Frame 2: EV 0 — sub-pixel aux 1 (restore AE before firing)
                 if (targetHighlightIndex < 0 && control != null) {
@@ -262,28 +249,26 @@ class CameraViewModel : ViewModel() {
                     delay(50)
                 }
                 val file2 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_2.jpg")
-                if (takeSinglePicture(capture, context, file2) && file2.exists() && file2.length() > 0) {
-                    tempFiles.add(file2)
-                }
+                tempFiles.add(file2)
+                check(takeSinglePicture(capture, context, file2) && file2.length() > 0) { "HDR frame 3 failed" }
 
                 // Frame 3: EV 0 — sub-pixel aux 2
                 val file3 = File(context.cacheDir, "hdr_${UUID.randomUUID()}_3.jpg")
-                if (takeSinglePicture(capture, context, file3) && file3.exists() && file3.length() > 0) {
-                    tempFiles.add(file3)
-                }
+                tempFiles.add(file3)
+                check(takeSinglePicture(capture, context, file3) && file3.length() > 0) { "HDR frame 4 failed" }
 
                 if (tempFiles.isEmpty()) {
                     _isCapturing.value = false
                     return@launch
                 }
 
-                val finalPhotoFile = File(context.cacheDir, "${UUID.randomUUID()}.jpg")
 
                 withContext(Dispatchers.IO) {
                     val mats = mutableListOf<Mat>()
+                    try {
                     for (file in tempFiles) {
-                        val mat = Imgcodecs.imread(file.absolutePath)
-                        if (!mat.empty()) mats.add(mat)
+                        val mat = Imgcodecs.imread(file.absolutePath, Imgcodecs.IMREAD_COLOR or Imgcodecs.IMREAD_IGNORE_ORIENTATION)
+                        if (!mat.empty()) mats.add(mat) else mat.release()
                     }
 
                     if (mats.isNotEmpty()) {
@@ -301,19 +286,20 @@ class CameraViewModel : ViewModel() {
                             normalizeExifOrientation(finalPhotoFile)
                             ExifUtils.stampSignature(finalPhotoFile, mode = "Full HDR")
                         }
-                        for (m in mats) m.release()
+
                     } else {
                         tempFiles[0].copyTo(finalPhotoFile, overwrite = true)
                         normalizeExifOrientation(finalPhotoFile)
                         ExifUtils.stampSignature(finalPhotoFile, mode = "Full HDR")
                     }
 
-                    for (f in tempFiles) f.delete()
+                    } finally { mats.forEach { it.release() } }
                 }
 
                 val (photoW, photoH) = getImageDimensions(finalPhotoFile)
+                check(photoW > 0f && photoH > 0f) { "HDR output is unreadable" }
                 val currentResult = _detectedQuad.value
-                val finalQuad = computeTargetQuad(currentResult, photoW, photoH)
+                val finalQuad = withContext(Dispatchers.IO) { detectSavedQuad(finalPhotoFile, photoW, photoH) }
 
                 val newPage = ScannedPage(
                     id = UUID.randomUUID().toString(),
@@ -321,17 +307,21 @@ class CameraViewModel : ViewModel() {
                     quad = finalQuad,
                     filter = ImageFilter.MAGIC_COLOR
                 )
-                PageRepository.addPage(newPage)
+                withContext(Dispatchers.IO) { PageRepository.addPage(newPage) }
+                saved = true
 
                 withContext(Dispatchers.Main) {
                     _isCapturing.value = false
                     frameAnalyzer?.resetStability()
                     onPageSaved(newPage.id)
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
-                e.printStackTrace()
-                _isCapturing.value = false
+                reportError(e.message ?: "HDR capture failed")
             } finally {
+                _isCapturing.value = false
+                tempFiles.forEach { it.delete() }
+                if (!saved && PageRepository.pages.value.none { it.originalImagePath == finalPhotoFile.absolutePath }) finalPhotoFile.delete()
                 control?.setExposureCompensationIndex(0)
             }
         }
@@ -375,11 +365,11 @@ class CameraViewModel : ViewModel() {
             else -> fusedMat
         }
 
-        val saveParams = org.opencv.core.MatOfInt(org.opencv.imgcodecs.Imgcodecs.IMWRITE_JPEG_QUALITY, jpegQuality)
-        Imgcodecs.imwrite(outFile.absolutePath, uprightMat, saveParams)
-        saveParams.release()
-        uprightMat.release()
-        ExifUtils.copyAndStampExif(refFile, outFile, mode = mode)
+        val saveParams = org.opencv.core.MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, jpegQuality)
+        try {
+            check(Imgcodecs.imwrite(outFile.absolutePath, uprightMat, saveParams)) { "Cannot save HDR image" }
+            ExifUtils.copyAndStampExif(refFile, outFile, mode = mode)
+        } finally { saveParams.release(); uprightMat.release() }
     }
 
     private suspend fun setExposureIndex(
@@ -431,47 +421,31 @@ class CameraViewModel : ViewModel() {
      * For fused multi-frame output, use [rotateAndSaveFusedMat] instead to avoid full JPEG re-decode.
      */
     private fun normalizeExifOrientation(file: File): Pair<Float, Float> {
+        val mat = Imgcodecs.imread(file.absolutePath) // OpenCV applies all EXIF orientations.
+        val normalized = File(file.parentFile, "normalized_${UUID.randomUUID()}.jpg")
+        val params = org.opencv.core.MatOfInt(Imgcodecs.IMWRITE_JPEG_QUALITY, 95)
         try {
-            val exif = ExifInterface(file.absolutePath)
-            val orientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
-            val rotationDegrees = when (orientation) {
-                ExifInterface.ORIENTATION_ROTATE_90 -> 90
-                ExifInterface.ORIENTATION_ROTATE_180 -> 180
-                ExifInterface.ORIENTATION_ROTATE_270 -> 270
-                else -> 0
-            }
-            if (rotationDegrees != 0) {
-                val bitmap = BitmapFactory.decodeFile(file.absolutePath)
-                if (bitmap != null) {
-                    val matrix = Matrix().apply { postRotate(rotationDegrees.toFloat()) }
-                    val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-                    FileOutputStream(file).use { out ->
-                        rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 100, out)
-                    }
-                    val existingMode = ExifUtils.extractMode(exif)
-                    val newExif = ExifInterface(file.absolutePath)
-                    newExif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
-                    ExifUtils.stampSignature(newExif, existingMode)
-                    newExif.saveAttributes()
-                    if (rotatedBitmap != bitmap) bitmap.recycle()
-                    val w = rotatedBitmap.width.toFloat()
-                    val h = rotatedBitmap.height.toFloat()
-                    rotatedBitmap.recycle()
-                    return Pair(w, h)
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeFile(file.absolutePath, boundsOpts)
-        return Pair(boundsOpts.outWidth.toFloat(), boundsOpts.outHeight.toFloat())
+            check(!mat.empty()) { "Image cannot be decoded" }
+            val dimensions = mat.cols().toFloat() to mat.rows().toFloat()
+            check(Imgcodecs.imwrite(normalized.absolutePath, mat, params)) { "Cannot save image" }
+            ExifUtils.copyAndStampExif(file, normalized)
+            java.nio.file.Files.move(normalized.toPath(), file.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            return dimensions
+        } finally { mat.release(); params.release(); normalized.delete() }
     }
 
     private fun getImageDimensions(file: File): Pair<Float, Float> {
         val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(file.absolutePath, boundsOpts)
         return Pair(boundsOpts.outWidth.toFloat(), boundsOpts.outHeight.toFloat())
+    }
+
+    private fun detectSavedQuad(file: File, width: Float, height: Float): DocumentQuad {
+        val gray = Imgcodecs.imread(file.absolutePath, Imgcodecs.IMREAD_GRAYSCALE)
+        try {
+            val result = com.scanner.app.engine.NativeEdgeDetector().detectDocument(gray, false)
+            return result.quad?.takeIf { result.found && it.isValid() } ?: computeTargetQuad(null, width, height)
+        } finally { gray.release() }
     }
 
     private fun computeTargetQuad(currentResult: DetectionResult?, photoW: Float, photoH: Float): DocumentQuad {
@@ -486,8 +460,8 @@ class CameraViewModel : ViewModel() {
                 bottomLeft = PointF((q.bottomLeft.x * sx).coerceIn(0f, photoW), (q.bottomLeft.y * sy).coerceIn(0f, photoH))
             )
         } else {
-            val insetX = photoW * 0.08f
-            val insetY = photoH * 0.08f
+            val insetX = 0f
+            val insetY = 0f
             DocumentQuad(
                 topLeft = PointF(insetX, insetY),
                 topRight = PointF(photoW - insetX, insetY),
@@ -498,32 +472,28 @@ class CameraViewModel : ViewModel() {
     }
 
     fun importFromUri(context: Context, uri: Uri, onPageSaved: (String) -> Unit) {
-        viewModelScope.launch(Dispatchers.IO) {
+        if (_isCapturing.value) return
+        _isCapturing.value = true
+        viewModelScope.launch {
+            val photoFile = File(com.scanner.app.data.image.ImageStorage(context).getStorageDir(), "${UUID.randomUUID()}.jpg")
+            var saved = false
             try {
-                val photoFile = File(context.cacheDir, "${java.util.UUID.randomUUID()}.jpg")
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    photoFile.outputStream().use { output -> input.copyTo(output) }
-                }
-                if (photoFile.exists() && photoFile.length() > 0) {
-                    val (photoW, photoH) = normalizeExifOrientation(photoFile)
-                    val mat = Imgcodecs.imread(photoFile.absolutePath)
-                    val detector = com.scanner.app.engine.NativeEdgeDetector()
-                    val detected = if (!mat.empty()) detector.detectDocument(mat, false) else null
-                    mat.release()
-
-                    val targetQuad = if (detected?.found == true && detected.quad != null) {
-                        detected.quad
-                    } else {
-                        computeTargetQuad(null, photoW, photoH)
+                val page = withContext(Dispatchers.IO) {
+                    checkNotNull(context.contentResolver.openInputStream(uri)) { "Cannot open image" }.use { input ->
+                        photoFile.outputStream().use { output -> input.copyTo(output) }
                     }
-
-                    val page = ScannedPage(originalImagePath = photoFile.absolutePath, quad = targetQuad)
-                    PageRepository.addPage(page)
-                    withContext(Dispatchers.Main) { onPageSaved(page.id) }
+                    val (w, h) = normalizeExifOrientation(photoFile)
+                    val gray = Imgcodecs.imread(photoFile.absolutePath, Imgcodecs.IMREAD_GRAYSCALE)
+                    val detected = try { com.scanner.app.engine.NativeEdgeDetector().detectDocument(gray, false) }
+                        finally { gray.release() }
+                    val quad = detected.quad?.takeIf { detected.found && it.isValid() } ?: computeTargetQuad(null, w, h)
+                    ScannedPage(originalImagePath = photoFile.absolutePath, quad = quad).also(PageRepository::addPage)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+                saved = true
+                onPageSaved(page.id)
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { reportError(e.message ?: "Image import failed") }
+            finally { _isCapturing.value = false; if (!saved && PageRepository.pages.value.none { it.originalImagePath == photoFile.absolutePath }) photoFile.delete() }
         }
     }
 }

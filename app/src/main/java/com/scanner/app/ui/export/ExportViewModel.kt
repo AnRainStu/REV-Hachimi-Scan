@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 sealed class ExportState {
     object Idle : ExportState()
     object Exporting : ExportState()
-    data class Success(val path: String) : ExportState()
+    data class Success(val result: com.scanner.app.data.export.ExportResult) : ExportState()
     data class Error(val message: String) : ExportState()
 }
 
@@ -26,20 +26,24 @@ class ExportViewModel : ViewModel() {
     val exportState: StateFlow<ExportState> = _exportState.asStateFlow()
 
     fun export(context: Context, pages: List<ScannedPage>, config: ExportConfig) {
+        if (_exportState.value is ExportState.Exporting) return
+        _exportState.value = ExportState.Exporting
+        val snapshot = pages.toList()
+        val appContext = context.applicationContext
         viewModelScope.launch(Dispatchers.IO) {
-            _exportState.value = ExportState.Exporting
             try {
                 val exportedFile = when (config.exportMode) {
                     ExportMode.FOLDER -> {
-                        val exporter = FolderExporter(context)
-                        exporter.export(pages, config)
+                        val exporter = FolderExporter(appContext)
+                        exporter.export(snapshot, config)
                     }
                     ExportMode.PDF -> {
-                        val exporter = PdfExporter(context)
-                        exporter.export(pages, config)
+                        val exporter = PdfExporter(appContext)
+                        exporter.export(snapshot, config)
                     }
                 }
-                _exportState.value = ExportState.Success(exportedFile.absolutePath)
+                _exportState.value = ExportState.Success(exportedFile)
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 _exportState.value = ExportState.Error(e.message ?: "Unknown error occurred")
             }

@@ -24,15 +24,16 @@ val buildTime = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
 android {
     namespace = "com.scanner.app"
     compileSdk = 35
-    buildToolsVersion = "36.0.0"
-    ndkVersion = "30.0.16248370"
+    buildToolsVersion = "35.0.0"
+    ndkVersion = "26.3.11579264"
 
     defaultConfig {
         applicationId = "moe.hachimi.cam"
         minSdk = 29
         targetSdk = 35
-        versionCode = 7
-        versionName = "0.1.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        versionCode = 8
+        versionName = "0.2.0"
 
         buildConfigField("String", "GIT_HASH", "\"$gitCommit\"")
         buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
@@ -78,33 +79,26 @@ android {
 
     signingConfigs {
         create("release") {
-            val keyFile = file("hachimi-release.jks")
-            if (keyFile.exists()) {
-                storeFile = keyFile
-                storePassword = "hachimi123"
-                keyAlias = "hachimi"
-                keyPassword = "hachimi123"
-                enableV1Signing = true
-                enableV2Signing = true
-                enableV3Signing = true
+            val keyPath = providers.environmentVariable("SIGNING_STORE_FILE").orNull
+            if (!keyPath.isNullOrBlank()) {
+                storeFile = file(keyPath)
+                storePassword = providers.environmentVariable("SIGNING_STORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("SIGNING_KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("SIGNING_KEY_PASSWORD").orNull
             }
         }
     }
-
     buildTypes {
-        debug {
-            signingConfig = signingConfigs.getByName("release")
-        }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            if (providers.environmentVariable("SIGNING_STORE_FILE").isPresent) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
-    
+    testOptions { unitTests.isIncludeAndroidResources = true }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -148,6 +142,12 @@ dependencies {
     
     implementation("androidx.navigation:navigation-compose:2.8.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("androidx.test:core:1.6.1")
     
     val cameraxVersion = "1.4.1"
     implementation("androidx.camera:camera-camera2:$cameraxVersion")

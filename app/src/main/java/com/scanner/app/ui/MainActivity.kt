@@ -47,7 +47,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         title = "HachiCam"
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             setTaskDescription(
                 android.app.ActivityManager.TaskDescription.Builder()
                     .setLabel("HachiCam")
@@ -57,43 +57,8 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContent {
             DocScannerTheme {
-                var hasCameraPermission by remember {
-                    mutableStateOf(
-                        ContextCompat.checkSelfPermission(
-                            this,
-                            Manifest.permission.CAMERA
-                        ) == PackageManager.PERMISSION_GRANTED
-                    )
-                }
-
-                val permissionLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestPermission(),
-                    onResult = { isGranted ->
-                        hasCameraPermission = isGranted
-                    }
-                )
-
-                LaunchedEffect(Unit) {
-                    if (!hasCameraPermission) {
-                        permissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    if (hasCameraPermission) {
-                        val navController = rememberNavController()
-                        DocScannerNavGraph(navController = navController)
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(text = "Camera permission is required to use this app.")
-                        }
-                    }
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    DocScannerNavGraph(navController = rememberNavController())
                 }
             }
         }

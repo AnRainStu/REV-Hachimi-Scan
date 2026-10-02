@@ -30,6 +30,11 @@ import java.io.File
 class CropViewModel : ViewModel() {
 
     private var currentPageId: String? = null
+    private var sourceRotation = 0
+    private var draftFile: File? = null
+    private val _error = MutableStateFlow<String?>(null)
+    val error = _error.asStateFlow()
+    fun dismissError() { _error.value = null }
 
     private val _imagePath = MutableStateFlow<String?>(null)
     val imagePath: StateFlow<String?> = _imagePath.asStateFlow()
@@ -59,14 +64,6 @@ class CropViewModel : ViewModel() {
     private val _detectedQuad = MutableStateFlow<DocumentQuad?>(null)
     val detectedQuad: StateFlow<DocumentQuad?> = _detectedQuad.asStateFlow()
 
-    private var grayMat: Mat? = null
-    private var edgeMat: Mat? = null
-    private var edgeJob: Job? = null
-    private val _grayMatAddr = MutableStateFlow(0L)
-    val grayMatAddr: StateFlow<Long> = _grayMatAddr.asStateFlow()
-    private val _edgeMatAddr = MutableStateFlow(0L)
-    val edgeMatAddr: StateFlow<Long> = _edgeMatAddr.asStateFlow()
-
     // Structural LSD line segments (SPEC_06 §2)
     private val _horizontalLines = MutableStateFlow(FloatArray(0))
     val horizontalLines: StateFlow<FloatArray> = _horizontalLines.asStateFlow()
@@ -78,10 +75,11 @@ class CropViewModel : ViewModel() {
 
     fun onBitmapLoaded(bitmap: Bitmap) {
         lsdJob?.cancel()
-        lsdJob = viewModelScope.launch(Dispatchers.Default) {
+        lsdJob = viewModelScope.launch {
             try {
-                val detector = com.scanner.app.engine.NativeEdgeDetector()
-                val (hLines, vLines) = detector.detectStructuralLines(bitmap)
+                val (hLines, vLines) = withContext(Dispatchers.Default) {
+                    com.scanner.app.engine.NativeEdgeDetector().detectStructuralLines(bitmap)
+                }
                 _horizontalLines.value = hLines
                 _verticalLines.value = vLines
             } catch (e: Exception) {
@@ -90,74 +88,23 @@ class CropViewModel : ViewModel() {
         }
     }
 
-    @Synchronized
-    private fun updateMats(newGray: Mat?, newEdges: Mat?) {
-        val oldGray = grayMat
-        val oldEdges = edgeMat
-        grayMat = newGray
-        edgeMat = newEdges
-        _grayMatAddr.value = newGray?.nativeObjAddr ?: 0L
-        _edgeMatAddr.value = newEdges?.nativeObjAddr ?: 0L
-        oldGray?.release()
-        oldEdges?.release()
-    }
-
-    private fun computeEdgeMat(imagePath: String) {
-        edgeJob?.cancel()
-        edgeJob = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val src = Imgcodecs.imread(imagePath)
-                if (!src.empty()) {
-                    val gray = Mat()
-                    Imgproc.cvtColor(src, gray, Imgproc.COLOR_BGR2GRAY)
-
-                    // 1. 对比度受限自适应直方图均衡化 (CLAHE) - 提取浅色弱对比度边缘 (SPEC_01 §2.2 & SPEC_05 §3.1)
-                    val clahe = Imgproc.createCLAHE(2.0, Size(8.0, 8.0))
-                    val claheMat = Mat()
-                    clahe.apply(gray, claheMat)
-
-                    // 2. 高斯平滑
-                    val blurred = Mat()
-                    Imgproc.GaussianBlur(claheMat, blurred, Size(5.0, 5.0), 1.0)
-
-                    // 3. 敏感固定阈值 (25.0, 70.0) - 彻底废弃全局 Otsu 避免弱对比度被吞噬
-                    val edges = Mat()
-                    Imgproc.Canny(blurred, edges, 25.0, 70.0)
-
-                    // 4. 闭运算连接断裂线
-                    val kernel = Imgproc.getStructuringElement(Imgproc.MORPH_RECT, Size(3.0, 3.0))
-                    Imgproc.morphologyEx(edges, edges, Imgproc.MORPH_CLOSE, kernel)
-                    kernel.release()
-
-                    claheMat.release()
-                    blurred.release()
-                    src.release()
-
-                    updateMats(gray, edges)
-                } else {
-                    updateMats(null, null)
-                }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateMats(null, null)
-            }
-        }
-    }
-
     fun tapToSnap(touchX: Float, touchY: Float) {
-        val addr = _grayMatAddr.value
-        if (addr != 0L) {
-            viewModelScope.launch(Dispatchers.Default) {
-                val detector = com.scanner.app.engine.NativeEdgeDetector()
-                val quad = detector.findContourAtPointAddr(addr, touchX, touchY)
-                if (quad != null) {
-                    _currentQuad.value = quad
+        val path = _imagePath.value ?: return
+        viewModelScope.launch {
+            try {
+                val quad = withContext(Dispatchers.Default) {
+                    val gray = Imgcodecs.imread(path, Imgcodecs.IMREAD_GRAYSCALE)
+                    try { if (gray.empty()) null else com.scanner.app.engine.NativeEdgeDetector().findContourAtPointAddr(gray.nativeObjAddr, touchX, touchY) }
+                    finally { gray.release() }
                 }
-            }
+                if (quad != null && quad.isValid()) _currentQuad.value = quad
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { _error.value = e.message }
         }
     }
 
     fun loadPage(pageId: String) {
+        if (currentPageId == pageId) return
         currentPageId = pageId
         val page = PageRepository.getPage(pageId) ?: return
         val savedRatio = page.targetAspectRatio
@@ -168,13 +115,38 @@ class CropViewModel : ViewModel() {
         } else {
             _customRatioValue.value = null
         }
-        _imagePath.value = page.originalImagePath
+        sourceRotation = page.sourceRotation
+        viewModelScope.launch {
+            try {
+                val file = withContext(Dispatchers.IO) {
+                    val target = File(File(page.originalImagePath).parentFile, "draft_${java.util.UUID.randomUUID()}.jpg")
+                    try {
+                        if (sourceRotation == 0) File(page.originalImagePath).copyTo(target)
+                        else {
+                            val mat = Imgcodecs.imread(page.originalImagePath)
+                            try {
+                                check(!mat.empty()) { "Cannot read original image" }
+                                Core.rotate(mat, mat, when (sourceRotation) {
+                                    90 -> Core.ROTATE_90_CLOCKWISE
+                                    180 -> Core.ROTATE_180
+                                    else -> Core.ROTATE_90_COUNTERCLOCKWISE
+                                })
+                                check(Imgcodecs.imwrite(target.absolutePath, mat)) { "Cannot prepare crop preview" }
+                            } finally { mat.release() }
+                        }
+                        target
+                    } catch (e: Throwable) { target.delete(); throw e }
+                }
+                draftFile?.delete(); draftFile = file; _imagePath.value = file.absolutePath
+                if (page.quad == null) resetToFullImage()
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { _error.value = e.message }
+        }
         _selectedFilter.value = page.filter
         page.quad?.let {
             _currentQuad.value = it
             _detectedQuad.value = it
         }
-        computeEdgeMat(page.originalImagePath)
     }
 
     fun setAspectRatio(preset: AspectRatioPreset) {
@@ -289,11 +261,14 @@ class CropViewModel : ViewModel() {
                     )
 
                     withContext(Dispatchers.Main) {
+                        sourceRotation = (sourceRotation + 90) % 360
+                        _detectedQuad.value = null
+                        _horizontalLines.value = FloatArray(0)
+                        _verticalLines.value = FloatArray(0)
                         _currentQuad.value = newQuad
                         _imageVersion.value++
                         onComplete()
                     }
-                    computeEdgeMat(path)
                     return@launch
                 }
             } catch (e: Exception) {
@@ -323,73 +298,39 @@ class CropViewModel : ViewModel() {
                 gray.release()
                 mat.release()
             }
-            computeEdgeMat(path)
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        edgeJob?.cancel()
-        updateMats(null, null)
+        lsdJob?.cancel()
+        draftFile?.delete()
     }
 
     fun setFilter(filter: ImageFilter) {
         _selectedFilter.value = filter
     }
 
-    fun confirmCrop(onDone: () -> Unit = {}) {
-        val id = currentPageId ?: run { onDone(); return }
-        val page = PageRepository.getPage(id) ?: run { onDone(); return }
-        val rawQuad = _currentQuad.value
+    private var isSaving = false
+    fun confirmCrop(onDone: (Boolean) -> Unit = {}) {
+        if (isSaving || _imagePath.value == null) { onDone(false); return }
+        val id = currentPageId ?: run { onDone(false); return }
+        val quad = _currentQuad.value
         val filter = _selectedFilter.value
-        val effectiveRatio = if (_selectedRatio.value == AspectRatioPreset.CUSTOM) {
-            _customRatioValue.value
-        } else {
-            _selectedRatio.value.ratio
-        }
-        val targetRatio = effectiveRatio ?: 0f
-
-        viewModelScope.launch(Dispatchers.Default) {
+        val ratio = if (_selectedRatio.value == AspectRatioPreset.CUSTOM) _customRatioValue.value else _selectedRatio.value.ratio
+        val rotation = sourceRotation
+        isSaving = true
+        viewModelScope.launch {
+            var success = false
             try {
-                val srcMat = Imgcodecs.imread(page.originalImagePath)
-                if (!srcMat.empty()) {
-                    val corrector = com.scanner.app.engine.NativePerspective()
-                    val warpedMat = corrector.processDocument(srcMat, rawQuad, filter, targetRatio)
-
-                    val origFile = File(page.originalImagePath)
-                    val croppedFile = File(origFile.parentFile, "crop_${page.id}.jpg")
-                    val saveParams = MatOfInt(
-                        Imgcodecs.IMWRITE_JPEG_QUALITY, 100,
-                        Imgcodecs.IMWRITE_JPEG_OPTIMIZE, 1
-                    )
-                    Imgcodecs.imwrite(croppedFile.absolutePath, warpedMat, saveParams)
-                    saveParams.release()
-                    ExifUtils.copyAndStampExif(origFile, croppedFile)
-
-                    srcMat.release()
-                    warpedMat.release()
-
-                    val updatedPage = page.copy(
-                        processedImagePath = croppedFile.absolutePath,
-                        quad = rawQuad,
-                        filter = filter,
-                        targetAspectRatio = effectiveRatio
-                    )
-                    PageRepository.updatePage(updatedPage)
-                    withContext(Dispatchers.Main) {
-                        onDone()
-                    }
-                    return@launch
+                check(PageRepository.getPage(id) != null) { "Page no longer exists" }
+                com.scanner.app.data.image.PageEditor.edit(id) {
+                    it.copy(quad = quad, filter = filter, targetAspectRatio = ratio, sourceRotation = rotation)
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            val updatedPage = page.copy(quad = rawQuad, filter = filter, targetAspectRatio = effectiveRatio)
-            PageRepository.updatePage(updatedPage)
-            withContext(Dispatchers.Main) {
-                onDone()
-            }
+                success = true
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { _error.value = e.message ?: "Crop failed" }
+            finally { isSaving = false; onDone(success) }
         }
     }
 }

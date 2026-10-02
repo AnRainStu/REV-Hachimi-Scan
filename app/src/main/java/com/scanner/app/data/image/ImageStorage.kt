@@ -13,7 +13,7 @@ class ImageStorage(private val context: Context) {
     fun saveScannedImage(bitmap: Bitmap, quality: Int = 90): String {
         val file = File(getStorageDir(), "${generateFileName()}.jpg")
         FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)
+            check(bitmap.compress(Bitmap.CompressFormat.JPEG, quality, out)) { "Cannot save scan" }
         }
         return file.absolutePath
     }
@@ -21,7 +21,7 @@ class ImageStorage(private val context: Context) {
     fun saveThumbnail(bitmap: Bitmap): String {
         val file = File(getStorageDir(), "thumb_${generateFileName()}.jpg")
         FileOutputStream(file).use { out ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 70, out)
+            check(bitmap.compress(Bitmap.CompressFormat.JPEG, 70, out)) { "Cannot save thumbnail" }
         }
         return file.absolutePath
     }
@@ -36,7 +36,7 @@ class ImageStorage(private val context: Context) {
     fun getStorageDir(): File {
         val dir = File(context.filesDir, "scans")
         if (!dir.exists()) {
-            dir.mkdirs()
+            check(dir.mkdirs()) { "Cannot create scan storage" }
         }
         return dir
     }

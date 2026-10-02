@@ -26,6 +26,7 @@ class NativeBurstFusion {
 
         val addrs = burstFrames.map { it.nativeObjAddr }.toLongArray()
         val resultAddr = nativeFuseBurstFrames(addrs, removeGlare, isScreenMode, superResolution)
+        check(resultAddr != 0L) { "Native fusion failed" }
         return Mat(resultAddr)
     }
 
