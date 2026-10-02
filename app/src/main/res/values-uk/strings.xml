@@ -15,8 +15,8 @@
     <string name="export_pdf">PDF</string>
     <string name="export_name">Назва для експорту</string>
     <string name="exporting">Експортування&#8230;</string>
-    <string name="export_success">Експорт успішний</string>
-    <string name="export_error">Помилка експорту</string>
+    <string name="export_success">Експорт успішний: %s</string>
+    <string name="export_error">Помилка експорту: %s</string>
     <string name="delete">Видалити</string>
     <string name="rotate">Повернути</string>
     <string name="language">Мова</string>

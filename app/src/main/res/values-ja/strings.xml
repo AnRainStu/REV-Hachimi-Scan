@@ -15,8 +15,8 @@
     <string name="export_pdf">PDF</string>
     <string name="export_name">エクスポート名</string>
     <string name="exporting">エクスポート中&#8230;</string>
-    <string name="export_success">エクスポート完了</string>
-    <string name="export_error">エクスポート失敗</string>
+    <string name="export_success">エクスポート完了: %s</string>
+    <string name="export_error">エクスポート失敗: %s</string>
     <string name="delete">削除</string>
     <string name="rotate">回転</string>
     <string name="language">言語</string>

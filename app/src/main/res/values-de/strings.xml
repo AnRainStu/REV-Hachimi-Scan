@@ -15,8 +15,8 @@
     <string name="export_pdf">PDF</string>
     <string name="export_name">Exportname</string>
     <string name="exporting">Wird exportiert&#8230;</string>
-    <string name="export_success">Export erfolgreich</string>
-    <string name="export_error">Export fehlgeschlagen</string>
+    <string name="export_success">Export erfolgreich: %s</string>
+    <string name="export_error">Export fehlgeschlagen: %s</string>
     <string name="delete">Löschen</string>
     <string name="rotate">Drehen</string>
     <string name="language">Sprache</string>
