@@ -59,14 +59,23 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
+          # Use GLES software rendering rather than the deprecated indirect Vulkan path.
+          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
+          ram-size: 2048M
           disable-animations: true
           script: |
             bash gradlew connectedHachimiDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain
+            bash gradlew --stop
+            mkdir -p work/screenshots
+            free -m > work/screenshots/host-memory.txt
+            adb logcat -c
+            adb logcat > work/screenshots/device.log 2>&1 &
             adb shell wm size 480x800
             adb shell wm density 160
             adb shell am force-stop moe.hachimi.cam
             adb shell am start -n moe.hachimi.cam/com.scanner.app.ui.MainActivity
             sleep 4
+            adb exec-out screencap -p > work/screenshots/startup.png
             python3 .github/scripts/capture-ui.py
       - uses: actions/upload-artifact@v4
         if: always()
