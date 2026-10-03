@@ -26,7 +26,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -43,6 +42,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.ui.components.GlassSurface
+import com.scanner.app.ui.components.AmbientBackground
 import com.scanner.app.R
 import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
@@ -125,9 +125,7 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                     .border(1.dp, Color.White, RoundedCornerShape(8.dp)))
             }
         } else {
-            Box(Modifier.fillMaxSize().background(Brush.radialGradient(
-                listOf(Color(0xFF203454), Color(0xFF101114)),
-                radius = with(chromeDensity) { 360.dp.toPx() })))
+            AmbientBackground(forceDark = true)
             BoxWithConstraints(Modifier.fillMaxSize().padding(top = with(chromeDensity) { topChrome.toDp() },
                 bottom = with(chromeDensity) { bottomChrome.toDp() })) {
             val compact = maxHeight < 460.dp

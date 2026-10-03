@@ -2,10 +2,12 @@
 import itertools
 import re
 import subprocess
+import struct
 import sys
 import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
+import zlib
 
 output = Path('work/screenshots')
 output.mkdir(parents=True, exist_ok=True)
@@ -140,6 +142,120 @@ def toggle_transparency(expected):
     assert switch.get('checked') == str(expected).lower(), 'Transparency preference did not update'
 
 
+def background_samples(png):
+    """Decode ordinary Android 8-bit RGB/RGBA PNGs with the standard library only.
+
+    Sample narrow outer margins below the toolbar and above the dock, avoiding clocks,
+    document/text content, and controls. Unsupported PNGs still remain useful artifacts.
+    """
+    if not png.startswith(b'\x89PNG\r\n\x1a\n'):
+        raise ValueError('Not a PNG')
+    compressed = bytearray()
+    offset = 8
+    while offset < len(png):
+        size = struct.unpack_from('>I', png, offset)[0]
+        kind = png[offset + 4:offset + 8]
+        data = png[offset + 8:offset + 8 + size]
+        if kind == b'IHDR':
+            width, height, bits, colors, compression, filtering, interlace = struct.unpack('>IIBBBBB', data)
+            if bits != 8 or colors not in (2, 6) or compression or filtering or interlace:
+                raise ValueError('PNG format is outside the screencap RGB/RGBA subset')
+            channels = 3 if colors == 2 else 4
+        elif kind == b'IDAT':
+            compressed.extend(data)
+        elif kind == b'IEND':
+            break
+        offset += size + 12
+    stride = width * channels
+    decoded = zlib.decompress(compressed)
+    if len(decoded) != (stride + 1) * height:
+        raise ValueError('Unexpected PNG row size')
+    previous = bytearray(stride)
+    values = []
+    for y in range(height):
+        start = y * (stride + 1)
+        mode = decoded[start]
+        row = bytearray(decoded[start + 1:start + 1 + stride])
+        if mode not in range(5):
+            raise ValueError('Unknown PNG row filter')
+        if mode:
+            for i in range(stride):
+                left = row[i - channels] if i >= channels else 0
+                above = previous[i]
+                upper_left = previous[i - channels] if i >= channels else 0
+                if mode == 1:
+                    predictor = left
+                elif mode == 2:
+                    predictor = above
+                elif mode == 3:
+                    predictor = (left + above) // 2
+                else:
+                    p = left + above - upper_left
+                    a, b, c = abs(p - left), abs(p - above), abs(p - upper_left)
+                    predictor = left if a <= b and a <= c else above if b <= c else upper_left
+                row[i] = (row[i] + predictor) & 255
+        if 120 <= y < height - 120 and y % 4 == 0:
+            for x in (4, 8, 12, width - 13, width - 9, width - 5):
+                values.extend(row[x * channels:x * channels + 3])
+        previous = row
+    return (width, height), values
+
+
+def ambient_pair(prefix, interval):
+    # No taps, UI dumps, or settings changes between frames: only the background may move.
+    first = adb('exec-out', 'screencap', '-p')
+    (output / f'{prefix}-a.png').write_bytes(first)
+    time.sleep(interval)
+    second = adb('exec-out', 'screencap', '-p')
+    (output / f'{prefix}-b.png').write_bytes(second)
+    message = f'{prefix}: PNG bytes identical={first == second}; frame interval={interval}s'
+    try:
+        dimensions, a = background_samples(first)
+        other_dimensions, b = background_samples(second)
+        if dimensions != other_dimensions or len(a) != len(b) or not a:
+            raise ValueError('Frame sizes or sample counts changed')
+        differences = [abs(left - right) for left, right in zip(a, b)]
+        message += f'; background RGB mean delta={sum(differences) / len(differences):.4f}, max delta={max(differences)}'
+    except Exception as decode_error:
+        message += f'; background decoder skipped: {decode_error}'
+    print(message, flush=True)
+    with (output / 'ambient-diagnostics.txt').open('a', encoding='utf-8') as report:
+        report.write(message + '\n')
+
+
+def record_ambient():
+    """Best-effort six-second video; recording and pull share a 20-second deadline."""
+    video = output / 'ambient.mp4'
+    deadline = time.monotonic() + 20
+    try:
+        subprocess.run(['adb', 'shell', 'screenrecord', '--size', '480x800',
+                        '--bit-rate', '2000000', '--time-limit', '6', '/sdcard/ambient.mp4'],
+                       check=True, capture_output=True, timeout=20)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError('Video recording exceeded its 20-second deadline')
+        subprocess.run(['adb', 'pull', '/sdcard/ambient.mp4', str(video)],
+                       check=True, capture_output=True, timeout=remaining)
+        with video.open('rb') as stream:
+            header = stream.read(8)
+        if video.stat().st_size < 32 or header[4:8] != b'ftyp':
+            raise ValueError('screenrecord output has no MP4 container header')
+        message = f'Saved ambient.mp4 ({video.stat().st_size} bytes, six-second recording)'
+    except Exception as recording_error:
+        # Unsupported encoders or a slow/offline device must not fail the UI checks.
+        try:
+            video.unlink(missing_ok=True)
+        except OSError:
+            pass
+        detail = getattr(recording_error, 'stderr', b'') or b''
+        if isinstance(detail, bytes):
+            detail = detail.decode(errors='replace')
+        message = f'screenrecord skipped: {recording_error}; {detail[:500]}'
+    print(message, flush=True)
+    with (output / 'ambient-diagnostics.txt').open('a', encoding='utf-8') as report:
+        report.write(message + '\n')
+
+
 capture('library', 'My scans', ('Export', 'Scan', 'Settings', 'Select'))
 first_page_top = locate('Page 1')[1]
 scroll(True)
@@ -227,3 +343,21 @@ time.sleep(1)
 empty = snapshot()
 assert not any(node.get('content-desc') == 'Page 1' or node.get('text') == 'Page 1' for node in empty[0]), 'Delete left fixture pages visible'
 capture('library-empty', 'Scan', ('Scan', 'Settings'))
+
+# The emulator normally disables animations. Check both the frozen accessible fallback
+# and actual movement after changing only animator scale on this same empty-library screen.
+previous_animator_scale = adb('shell', 'settings', 'get', 'global', 'animator_duration_scale').decode().strip()
+try:
+    adb('shell', 'settings', 'put', 'global', 'animator_duration_scale', '0')
+    time.sleep(.4)
+    ambient_pair('ambient-static', 1)
+    adb('shell', 'settings', 'put', 'global', 'animator_duration_scale', '1')
+    time.sleep(.6)
+    assert_controls(('Scan', 'Settings'))
+    ambient_pair('ambient', 2.5)
+    record_ambient()
+finally:
+    if previous_animator_scale == 'null':
+        adb('shell', 'settings', 'delete', 'global', 'animator_duration_scale')
+    else:
+        adb('shell', 'settings', 'put', 'global', 'animator_duration_scale', previous_animator_scale)

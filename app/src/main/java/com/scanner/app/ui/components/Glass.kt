@@ -66,7 +66,7 @@ fun GlassScaffold(
                     layer.record { this@drawWithContent.drawContent() }
                     drawLayer(layer)
                 }) {
-                GlassCanvas()
+                AmbientBackground()
                 content(PaddingValues(top = with(density) { topHeight.toDp() },
                     bottom = maxOf(navigationInset, with(density) { bottomHeight.toDp() })))
                 // Scrolling paper must not compete with the system time and status icons.
@@ -83,27 +83,11 @@ fun GlassScaffold(
     }
 }
 
-/** Quiet ambient light gives transparent controls something to transmit even in an empty library. */
-@Composable
-private fun GlassCanvas() {
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    Canvas(Modifier.fillMaxSize()) {
-        drawRect(Brush.verticalGradient(if (dark) listOf(Color(0xFF15171C), Color(0xFF101216))
-            else listOf(Color(0xFFF9F8F5), Color(0xFFF0F1F4))))
-        drawRect(Brush.radialGradient(listOf(Color(0xFF93BDF4).copy(alpha = if (dark) .15f else .17f), Color.Transparent),
-            center = Offset(size.width * .92f, size.height * .11f), radius = size.width * .82f))
-        drawRect(Brush.radialGradient(listOf(Color(0xFF87AFF0).copy(alpha = if (dark) .24f else .29f), Color.Transparent),
-            center = Offset(size.width * .17f, size.height * .91f), radius = size.width * .82f))
-        drawRect(Brush.radialGradient(listOf(Color(0xFFBCADF0).copy(alpha = if (dark) .19f else .22f), Color.Transparent),
-            center = Offset(size.width * .98f, size.height * .91f), radius = size.width * .78f))
-    }
-}
-
 /**
  * Clear liquid material: a captured backdrop with localized edge refraction on Android 13+.
  * Android 12 uses real GPU backdrop blur; older/native preview surfaces use a translucent
  * material. Foreground content is a separate sibling and is never passed through the effect.
- * Recording stays on the GPU: no bitmap readback, frame ticker or changing shader time.
+ * Recording stays on the GPU: no bitmap readback or time-driven optical shader.
  */
 @Composable
 fun GlassSurface(
@@ -181,7 +165,7 @@ fun GlassSurface(
 }
 
 @Composable
-private fun rememberPowerSaveMode(): Boolean {
+internal fun rememberPowerSaveMode(): Boolean {
     val context = LocalContext.current
     val power = remember(context) { context.getSystemService(PowerManager::class.java) }
     var saving by remember(power) { mutableStateOf(power?.isPowerSaveMode == true) }
