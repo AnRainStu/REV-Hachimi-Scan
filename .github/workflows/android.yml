@@ -64,6 +64,8 @@ jobs:
           ram-size: 2048M
           disable-animations: true
           script: |
+            # The scanner uses no SMS services; keep the bundled Messages ANR off the test UI.
+            adb shell pm disable-user --user 0 com.google.android.apps.messaging
             bash gradlew connectedHachimiDebugAndroidTest -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true --console=plain
             bash gradlew --stop
             mkdir -p work/screenshots
