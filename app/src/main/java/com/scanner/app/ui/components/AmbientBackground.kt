@@ -65,7 +65,8 @@ fun AmbientBackground(modifier: Modifier = Modifier, forceDark: Boolean = false)
         }
     }
 
-    Canvas(modifier.fillMaxSize().graphicsLayer()) {
+    // Bound the moving light node before it is sampled by the glass backdrop.
+    Canvas(modifier.fillMaxSize().graphicsLayer { clip = true }) {
         // Read the clock only during drawing, keeping the page out of per-frame composition.
         val t = phase.floatValue
         val w = size.width
