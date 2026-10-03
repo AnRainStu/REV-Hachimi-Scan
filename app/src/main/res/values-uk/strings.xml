@@ -87,4 +87,13 @@
     <string name="ratio_free">Вільний</string>
     <string name="reduce_transparency">Зменшити прозорість</string>
     <string name="reduce_transparency_summary">Непрозорі панелі покращують читабельність тексту й елементів керування.</string>
+    <string name="library_recent">Останні скани</string>
+    <string name="library_local">На пристрої</string>
+    <string name="paper_size">Розмір паперу</string>
+    <plurals name="library_count">
+        <item quantity="one">%d скан</item>
+        <item quantity="few">%d скани</item>
+        <item quantity="many">%d сканів</item>
+        <item quantity="other">%d сканів</item>
+    </plurals>
 </resources>

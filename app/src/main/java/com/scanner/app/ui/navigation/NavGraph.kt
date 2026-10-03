@@ -62,7 +62,8 @@ fun DocScannerNavGraph(navController: NavHostController) {
                         launchSingleTop = true
                     }
                 },
-                onNavigateToCrop = { pageId -> navController.navigate(Screen.Crop.createRoute(pageId)) }
+                onNavigateToCrop = { pageId -> navController.navigate(Screen.Crop.createRoute(pageId)) },
+                onNavigateToSettings = { navController.navigate(Screen.Settings.route) }
             )
         }
         

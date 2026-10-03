@@ -87,4 +87,13 @@
     <string name="ratio_free">Свободный</string>
     <string name="reduce_transparency">Уменьшить прозрачность</string>
     <string name="reduce_transparency_summary">Непрозрачные панели улучшают читаемость текста и элементов управления.</string>
+    <string name="library_recent">Последние сканы</string>
+    <string name="library_local">На устройстве</string>
+    <string name="paper_size">Размер бумаги</string>
+    <plurals name="library_count">
+        <item quantity="one">%d скан</item>
+        <item quantity="few">%d скана</item>
+        <item quantity="many">%d сканов</item>
+        <item quantity="other">%d сканов</item>
+    </plurals>
 </resources>

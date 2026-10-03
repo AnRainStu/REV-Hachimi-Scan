@@ -87,4 +87,11 @@
     <string name="ratio_free">自由比例</string>
     <string name="reduce_transparency">减少透明度</string>
     <string name="reduce_transparency_summary">使用实色工具栏，提高文字和控件的清晰度。</string>
+    <string name="library_recent">最近扫描</string>
+    <string name="library_local">本机保存</string>
+    <string name="paper_size">纸张尺寸</string>
+    <plurals name="library_count">
+        <item quantity="one">%d 份扫描</item>
+        <item quantity="other">%d 份扫描</item>
+    </plurals>
 </resources>

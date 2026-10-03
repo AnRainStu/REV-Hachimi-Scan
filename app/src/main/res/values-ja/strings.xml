@@ -87,4 +87,11 @@
     <string name="ratio_free">自由</string>
     <string name="reduce_transparency">透明度を下げる</string>
     <string name="reduce_transparency_summary">ツールバーを不透明にして、文字や操作ボタンを見やすくします。</string>
+    <string name="library_recent">最近のスキャン</string>
+    <string name="library_local">このデバイス内</string>
+    <string name="paper_size">用紙サイズ</string>
+    <plurals name="library_count">
+        <item quantity="one">%d 件のスキャン</item>
+        <item quantity="other">%d 件のスキャン</item>
+    </plurals>
 </resources>

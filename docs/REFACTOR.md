@@ -1,12 +1,14 @@
 # Refactor notes
 
-## Glass interface (0.3.0)
+## Glass interface (0.4.0)
 
-`GlassScaffold` records the Compose content plane with `rememberGraphicsLayer`; floating navigation and docks sample that layer in their local coordinates. Only the sampled backdrop gets a GPU blur. Chrome is drawn afterwards and excluded from the recording, avoiding recursive feedback and blurred labels. Library content can scroll behind the floating controls; document cards keep opaque paper surfaces.
+The library uses a large title and an adaptive grid of paper document previews. Navigation, selection, scan and export are separate floating controls. Preview and crop tools use compact filter and aspect selections; camera controls float independently around the full-screen viewfinder. Library content can scroll beneath these controls while document cards keep opaque paper surfaces.
 
-The tint, edge highlight, rounded outline and shadow form an Apple-inspired material without copying platform assets or adding fonts. There are no continuously animated light effects or per-frame bitmap captures. Android 10/11 and the native CameraX viewfinder use a tinted fallback. Reduce transparency is persisted in settings and immediately changes all toolbars to solid surfaces; battery saver disables backdrop blur. The default Compose controls retain native focus, touch feedback and system animation scaling.
+`GlassScaffold` records the Compose content plane with `rememberGraphicsLayer`; glass controls sample it in their local coordinates. On API 33+, a GPU shader refracts the sampled image near each control's rounded edge and applies light diffusion. API 31/32 uses backdrop blur. Foreground labels and icons are drawn afterwards and excluded from the recorded plane, avoiding recursive feedback and blurred text. Older systems and the native CameraX viewfinder use a tinted fallback; the camera's native preview is not captured for refraction. There are no continuously animated light effects or per-frame bitmap readbacks.
 
-CI navigates by accessibility labels/bounds and captures the library in light/dark appearances, editor, crop, export, camera, settings and opaque mode on a real Android emulator. Existing native integration and data/export tests run alongside these navigation checks. Physical-device GPU cost and OEM rendering differences remain manual checks.
+Reduce transparency is persisted in settings and switches glass controls to solid surfaces. Battery saver also skips optical effects. Glass action buttons scale to 0.97 while pressed with a 120 ms response; system animation scaling is respected, including disabled animations. Controls retain native focus, touch semantics and readable foreground colors.
+
+CI seeds six upright document fixtures, navigates by accessibility labels and bounds, and captures the library in light/dark appearances and after scrolling beneath the floating controls. It also exercises a 320 × 640 viewport with font scale 1.3, preview, crop, export, camera, settings, reduced transparency, and the library's empty state after deleting all pages. Native integration and data/export tests remain alongside these interface checks. Each run publishes screenshots and reports; its Actions result records whether that run passed. Physical-device GPU cost and OEM rendering differences remain manual checks.
 
 ## Responsibility boundaries
 

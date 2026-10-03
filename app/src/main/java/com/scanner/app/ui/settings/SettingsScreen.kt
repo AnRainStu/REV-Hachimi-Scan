@@ -33,8 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.os.LocaleListCompat
 import com.scanner.app.ui.components.GlassScaffold
-import com.scanner.app.ui.components.GlassTopAppBar
-import com.scanner.app.ui.components.GlassDock
+import com.scanner.app.ui.components.GlassButton
 import com.scanner.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -80,28 +79,20 @@ fun SettingsScreen(
 
     GlassScaffold(
         topBar = {
-            GlassTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.settings),
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cancel)
-                        )
-                    }
+            Row(Modifier.statusBarsPadding().fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+                GlassButton(onNavigateBack, Modifier.size(52.dp), contentPadding = PaddingValues(14.dp)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.cancel), Modifier.size(24.dp))
                 }
-            )
+                Text(stringResource(R.string.settings), style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.SemiBold)
+            }
         }
     ) { paddingValues ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 20.dp),
             contentPadding = PaddingValues(top = paddingValues.calculateTopPadding() + 12.dp,
                 bottom = paddingValues.calculateBottomPadding() + 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -127,8 +118,7 @@ fun SettingsScreen(
                 )
 
                 Card(
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     ListItem(
@@ -172,8 +162,7 @@ fun SettingsScreen(
                 )
 
                 Card(
-                    shape = RoundedCornerShape(16.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     ListItem(
@@ -224,8 +213,7 @@ fun SettingsScreen(
                 )
 
                 Card(
-                    shape = RoundedCornerShape(20.dp),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                    shape = RoundedCornerShape(24.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                 ) {
                     Column(

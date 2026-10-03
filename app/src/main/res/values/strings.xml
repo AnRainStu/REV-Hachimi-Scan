@@ -87,4 +87,11 @@
     <string name="ratio_free">Free</string>
     <string name="reduce_transparency">Reduce transparency</string>
     <string name="reduce_transparency_summary">Use solid toolbars for clearer text and controls.</string>
+    <string name="library_recent">Recent scans</string>
+    <string name="library_local">On device</string>
+    <string name="paper_size">Paper size</string>
+    <plurals name="library_count">
+        <item quantity="one">%d scan</item>
+        <item quantity="other">%d scans</item>
+    </plurals>
 </resources>

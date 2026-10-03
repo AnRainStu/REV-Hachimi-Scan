@@ -3,6 +3,8 @@ package com.scanner.app.ui.components
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -35,11 +37,17 @@ fun AspectRatioBanner(selectedRatio: AspectRatioPreset, customRatioValue: Float?
         horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         AspectRatioPreset.entries.forEach { preset ->
             FilterChip(selected = selectedRatio == preset && (preset != AspectRatioPreset.CUSTOM || customRatioValue == null),
+                border = null, shape = RoundedCornerShape(18.dp), colors = FilterChipDefaults.filterChipColors(
+                    containerColor = Color.Transparent, selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = .12f),
+                    selectedLabelColor = MaterialTheme.colorScheme.onSurface),
                 onClick = { onSelectRatio(preset) }, label = {
                     Text(stringResource(if (preset == AspectRatioPreset.CUSTOM) R.string.ratio_free else preset.titleRes))
                 })
         }
         FilterChip(selected = selectedRatio == AspectRatioPreset.CUSTOM && customRatioValue != null,
+            border = null, shape = RoundedCornerShape(18.dp), colors = FilterChipDefaults.filterChipColors(
+                containerColor = Color.Transparent, selectedContainerColor = MaterialTheme.colorScheme.primary.copy(alpha = .12f),
+                selectedLabelColor = MaterialTheme.colorScheme.onSurface),
             onClick = { custom = true }, label = { Text(stringResource(R.string.ratio_custom)) })
     }
     if (custom) CustomRatioDialog(customRatioValue, { custom = false }) {

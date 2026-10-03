@@ -10,7 +10,6 @@ import androidx.camera.core.FocusMeteringAction
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -27,10 +26,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -118,14 +125,30 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                     .border(1.dp, Color.White, RoundedCornerShape(8.dp)))
             }
         } else {
+            Box(Modifier.fillMaxSize().background(Brush.radialGradient(
+                listOf(Color(0xFF203454), Color(0xFF101114)),
+                radius = with(chromeDensity) { 360.dp.toPx() })))
             BoxWithConstraints(Modifier.fillMaxSize().padding(top = with(chromeDensity) { topChrome.toDp() },
                 bottom = with(chromeDensity) { bottomChrome.toDp() })) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight).padding(24.dp),
+            val compact = maxHeight < 460.dp
+            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = maxHeight)
+                .padding(if (compact) 20.dp else 32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
-                Icon(Icons.Default.PhotoCamera, null, tint = Color.White, modifier = Modifier.size(40.dp))
-                Text(stringResource(R.string.camera_permission_required), color = Color.White)
-                Button(onClick = { permission.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.grant_permission)) }
+                verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 16.dp, Alignment.CenterVertically)) {
+                GlassSurface(Modifier.size(if (compact) 48.dp else 80.dp), dark = true, cornerRadius = 28.dp) {
+                    Icon(Icons.Default.PhotoCamera, null, tint = Color.White,
+                        modifier = Modifier.align(Alignment.Center).size(if (compact) 24.dp else 34.dp))
+                }
+                Text(stringResource(R.string.camera_permission_required), color = Color.White.copy(alpha = .72f),
+                    style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+                GlassSurface(dark = true, cornerRadius = 26.dp,
+                    tint = Color(0xFF005ACB), contentColor = Color.White, strong = true) {
+                    TextButton(onClick = { permission.launch(Manifest.permission.CAMERA) },
+                        colors = ButtonDefaults.textButtonColors(contentColor = Color.White),
+                        shape = CircleShape, contentPadding = PaddingValues(horizontal = 24.dp, vertical = 14.dp)) {
+                        Text(stringResource(R.string.grant_permission))
+                    }
+                }
                 TextButton(onClick = {
                     context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                         android.net.Uri.parse("package:${context.packageName}")))
@@ -133,43 +156,82 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
             }
             }
         }
-        GlassSurface(Modifier.align(Alignment.TopCenter).onSizeChanged { topChrome = it.height }.statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp).fillMaxWidth(), dark = true) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onNavigateToReview, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review), tint = Color.White) }
-            Text(stringResource(R.string.camera_title), color = Color.White, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            IconButton(onClick = { torch = !torch; viewModel.cameraControl?.enableTorch(torch) }, enabled = allowed && !busy && viewModel.cameraInfo?.hasFlashUnit() == true) {
-                Icon(if (torch) Icons.Default.FlashOn else Icons.Default.FlashOff, stringResource(R.string.torch), tint = Color.White)
+        Column(Modifier.align(Alignment.TopCenter).onSizeChanged { topChrome = it.height }
+            .statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                CameraGlassIcon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.review),
+                    onNavigateToReview, enabled = !busy)
+                Text(stringResource(R.string.camera_title), color = Color.White,
+                    style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                CameraGlassIcon(if (torch) Icons.Default.FlashOn else Icons.Default.FlashOff,
+                    stringResource(R.string.torch),
+                    onClick = { torch = !torch; viewModel.cameraControl?.enableTorch(torch) },
+                    enabled = allowed && !busy && viewModel.cameraInfo?.hasFlashUnit() == true,
+                    active = torch)
+                CameraGlassIcon(Icons.Default.Settings, stringResource(R.string.settings),
+                    onNavigateToSettings, enabled = !busy)
             }
-            IconButton(onClick = onNavigateToSettings, enabled = !busy) { Icon(Icons.Default.Settings, stringResource(R.string.settings), tint = Color.White) }
-        }
-        }
-        GlassSurface(Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomChrome = it.height }.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp).fillMaxWidth(), dark = true) {
-            Column(Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(stringResource(if (stable) R.string.steady else R.string.hold_steady), style = MaterialTheme.typography.bodyMedium,
-                    color = if (stable) Color(0xFF8BD7A9) else Color.White.copy(alpha = .75f))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(selected = curved, onClick = viewModel::toggleCurvedMode, enabled = !busy,
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = Color(0xFF282A32), labelColor = Color.White,
-                            selectedContainerColor = Color(0xFF174D83), selectedLabelColor = Color.White,
-                            disabledLabelColor = Color.White.copy(alpha = .45f)),
-                        label = { Text(stringResource(R.string.curved_mode)) })
-                    if (hdr) AssistChip(onClick = {},
-                        colors = AssistChipDefaults.assistChipColors(containerColor = Color(0xFF282A32), labelColor = Color.White),
-                        label = { Text(stringResource(R.string.full_hdr_title)) })
+            if (allowed) GlassSurface(dark = true, cornerRadius = 24.dp) {
+                Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.size(6.dp).background(if (stable) Color(0xFF7FE3A8) else Color.White.copy(alpha = .6f), CircleShape))
+                    Text(stringResource(if (stable) R.string.steady else R.string.hold_steady),
+                        style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Medium, color = Color.White)
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { gallery.launch("image/*") }, enabled = !busy) { Text(stringResource(R.string.import_image), color = Color.White) }
-                    FilledIconButton(onClick = { viewModel.capturePhoto(context, onNavigateToCrop) },
-                        enabled = allowed && preview != null && !busy, modifier = Modifier.size(76.dp).border(3.dp, Color.White.copy(alpha = .5f), CircleShape).padding(6.dp),
-                        colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color.White, contentColor = Color(0xFF1D1D1F))) {
-                        if (busy) CircularProgressIndicator(Modifier.size(28.dp))
-                        else Icon(Icons.Default.PhotoCamera, stringResource(R.string.capture), modifier = Modifier.size(32.dp))
+            }
+        }
+        Column(Modifier.align(Alignment.BottomCenter).onSizeChanged { bottomChrome = it.height }
+            .navigationBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp).fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (allowed) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                GlassSurface(dark = true, cornerRadius = 24.dp) {
+                    TextButton(onClick = viewModel::toggleCurvedMode, enabled = !busy,
+                        modifier = Modifier.semantics { selected = curved },
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) {
+                        Icon(Icons.Default.CropFree, null, Modifier.size(18.dp),
+                            tint = if (curved) Color(0xFF8DC6FF) else Color.White)
+                        Spacer(Modifier.width(7.dp))
+                        Text(stringResource(R.string.curved_mode), color = if (curved) Color(0xFF8DC6FF) else Color.White,
+                            fontWeight = FontWeight.SemiBold)
                     }
-                    TextButton(onClick = onNavigateToReview, enabled = !busy) { Text(stringResource(R.string.review_with_count, count), color = Color.White) }
                 }
-                if (busy) Text(stringResource(if (hdr) R.string.fusing_full_hdr else R.string.processing), style = MaterialTheme.typography.bodySmall)
+                if (hdr) GlassSurface(dark = true, cornerRadius = 24.dp) {
+                    Text(stringResource(R.string.full_hdr_title), Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                        style = MaterialTheme.typography.labelLarge, color = Color.White)
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    CameraSideAction(Icons.Default.AddPhotoAlternate, stringResource(R.string.import_image),
+                        onClick = { gallery.launch("image/*") }, enabled = !busy)
+                }
+                val shutterEnabled = allowed && preview != null && !busy
+                val captureDescription = stringResource(R.string.capture)
+                IconButton(onClick = { viewModel.capturePhoto(context, onNavigateToCrop) },
+                    enabled = shutterEnabled, modifier = Modifier.size(82.dp)
+                        .semantics { contentDescription = captureDescription }
+                        .border(3.dp, Color.White.copy(alpha = if (allowed) 1f else .35f), CircleShape)) {
+                    Box(Modifier.size(66.dp).background(Color.White.copy(alpha = if (allowed) 1f else .35f), CircleShape),
+                        contentAlignment = Alignment.Center) {
+                        if (busy) CircularProgressIndicator(Modifier.size(28.dp), color = Color(0xFF16181D), strokeWidth = 2.5.dp)
+                    }
+                }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                    CameraSideAction(Icons.Default.CollectionsBookmark, stringResource(R.string.review_with_count, count),
+                        onClick = onNavigateToReview, enabled = !busy)
+                }
+            }
+            if (busy) GlassSurface(dark = true, cornerRadius = 20.dp) {
+                Text(stringResource(if (hdr) R.string.fusing_full_hdr else R.string.processing),
+                    Modifier.padding(horizontal = 16.dp, vertical = 9.dp), style = MaterialTheme.typography.bodySmall,
+                    color = Color.White, textAlign = TextAlign.Center)
             }
         }
     }
@@ -186,5 +248,34 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
         }
         owner.lifecycle.addObserver(observer)
         onDispose { owner.lifecycle.removeObserver(observer) }
+    }
+}
+
+@Composable
+private fun CameraGlassIcon(icon: ImageVector, description: String, onClick: () -> Unit,
+    enabled: Boolean = true, active: Boolean = false) {
+    GlassSurface(Modifier.size(52.dp), dark = true, cornerRadius = 26.dp) {
+        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxSize()) {
+            Icon(icon, description, tint = when {
+                !enabled -> Color.White.copy(alpha = .4f)
+                active -> Color(0xFF8DC6FF)
+                else -> Color.White
+            }, modifier = Modifier.size(22.dp))
+        }
+    }
+}
+
+@Composable
+private fun CameraSideAction(icon: ImageVector, label: String, onClick: () -> Unit, enabled: Boolean) {
+    GlassSurface(Modifier.widthIn(min = 72.dp, max = 112.dp), dark = true, cornerRadius = 26.dp) {
+        TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth(),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                val color = Color.White.copy(alpha = if (enabled) 1f else .4f)
+                Icon(icon, null, Modifier.size(22.dp), tint = color)
+                Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium,
+                    color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }

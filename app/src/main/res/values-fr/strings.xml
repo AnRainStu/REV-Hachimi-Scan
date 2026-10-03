@@ -87,4 +87,11 @@
     <string name="ratio_free">Libre</string>
     <string name="reduce_transparency">Réduire la transparence</string>
     <string name="reduce_transparency_summary">Utiliser des barres opaques pour améliorer la lisibilité du texte et des commandes.</string>
+    <string name="library_recent">Scans récents</string>
+    <string name="library_local">Sur cet appareil</string>
+    <string name="paper_size">Format du papier</string>
+    <plurals name="library_count">
+        <item quantity="one">%d scan</item>
+        <item quantity="other">%d scans</item>
+    </plurals>
 </resources>

@@ -87,4 +87,11 @@
     <string name="ratio_free">Frei</string>
     <string name="reduce_transparency">Transparenz reduzieren</string>
     <string name="reduce_transparency_summary">Einfarbige Werkzeugleisten für besser lesbare Texte und Bedienelemente.</string>
+    <string name="library_recent">Letzte Scans</string>
+    <string name="library_local">Auf diesem Gerät</string>
+    <string name="paper_size">Papierformat</string>
+    <plurals name="library_count">
+        <item quantity="one">%d Scan</item>
+        <item quantity="other">%d Scans</item>
+    </plurals>
 </resources>

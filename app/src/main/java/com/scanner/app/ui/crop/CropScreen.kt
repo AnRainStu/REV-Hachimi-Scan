@@ -8,25 +8,18 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material.icons.filled.CropFree
 import androidx.compose.material.icons.filled.FilterBAndW
@@ -36,23 +29,22 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.ui.components.GlassScaffold
-import com.scanner.app.ui.components.GlassTopAppBar
-import com.scanner.app.ui.components.GlassDock
+import com.scanner.app.ui.components.GlassSurface
 import com.scanner.app.R
 import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.ImageFilter
-import com.scanner.app.ui.components.AspectRatioBanner
-import com.scanner.app.ui.theme.PrismCyan
-import com.scanner.app.ui.theme.SteadyEmerald
+import com.scanner.app.ui.components.CustomRatioDialog
 import java.io.File
 import kotlin.math.max
 import kotlinx.coroutines.launch
@@ -91,177 +83,85 @@ fun CropScreen(
 
     GlassScaffold(
         topBar = {
-            GlassTopAppBar(
-                title = {
-                    Text(
-                        text = stringResource(R.string.crop_title),
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onCancel) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cancel),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(
-                        enabled = !isRotating && !isSaving,
-                        onClick = {
-                            isRotating = true
-                            coroutineScope.launch {
-                                val animJob = launch {
-                                    rotationAngle.animateTo(
-                                        targetValue = 90f,
-                                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
-                                    )
-                                }
-                                viewModel.rotateImage {
-                                    coroutineScope.launch {
-                                        animJob.join()
-                                        rotationAngle.snapTo(0f)
-                                        isRotating = false
-                                    }
-                                }
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.rotate_90),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    IconButton(
-                        enabled = !isRotating && !isSaving,
-                        onClick = { viewModel.resetToFullImage() }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CropFree,
-                            contentDescription = stringResource(R.string.full_image),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                    IconButton(
-                        enabled = !isRotating && !isSaving,
-                        onClick = { viewModel.reDetect() }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AutoFixHigh,
-                            contentDescription = stringResource(R.string.auto_detect),
-                            tint = PrismCyan
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                )
-            )
-        },
-        bottomBar = {
-            GlassDock() {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 8.dp)
-                ) {
-                    // Aspect ratio banner row directly above the filter selector
-                    AspectRatioBanner(
-                        selectedRatio = selectedRatio,
-                        customRatioValue = customRatioValue,
-                        onSelectRatio = { viewModel.setAspectRatio(it) },
-                        onSelectCustomRatio = { viewModel.setCustomRatio(it) },
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                        thickness = 0.5.dp,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(end = 8.dp)
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_original),
-                                icon = Icons.Default.Image,
-                                isSelected = selectedFilter == ImageFilter.ORIGINAL,
-                                onClick = { viewModel.setFilter(ImageFilter.ORIGINAL) }
-                            )
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_magic),
-                                icon = Icons.Default.AutoAwesome,
-                                isSelected = selectedFilter == ImageFilter.MAGIC_COLOR,
-                                onClick = { viewModel.setFilter(ImageFilter.MAGIC_COLOR) }
-                            )
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_bw),
-                                icon = Icons.Default.Contrast,
-                                isSelected = selectedFilter == ImageFilter.BW,
-                                onClick = { viewModel.setFilter(ImageFilter.BW) }
-                            )
-                            CropFilterChip(
-                                label = stringResource(R.string.filter_grayscale),
-                                icon = Icons.Default.FilterBAndW,
-                                isSelected = selectedFilter == ImageFilter.GRAYSCALE,
-                                onClick = { viewModel.setFilter(ImageFilter.GRAYSCALE) }
-                            )
-                        }
-
-                        // Confirm Action Button
-                        Button(
-                            enabled = !isSaving && !isRotating,
+            Column(Modifier.statusBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CropGlassTool(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.cancel),
+                        enabled = !isSaving, onClick = onCancel)
+                    Text(stringResource(R.string.crop_title), Modifier.weight(1f),
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    GlassSurface(cornerRadius = 24.dp, tint = Color(0xFF005ACB), strong = true,
+                        contentColor = Color.White) {
+                        TextButton(enabled = !isSaving && !isRotating,
                             onClick = {
                                 isSaving = true
                                 viewModel.confirmCrop { success ->
                                     isSaving = false
                                     if (success) onConfirm()
                                 }
-                            },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
-                            ),
-                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-                        ) {
-                            if (isSaving) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(18.dp),
-                                    color = MaterialTheme.colorScheme.surface,
-                                    strokeWidth = 2.dp
-                                )
-                            } else {
-                                Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = stringResource(R.string.confirm),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = stringResource(R.string.confirm),
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1
-                                )
+                            }, shape = CircleShape,
+                            colors = ButtonDefaults.textButtonColors(contentColor = Color.White,
+                                disabledContentColor = Color.White.copy(alpha = .5f)),
+                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)) {
+                            if (isSaving) CircularProgressIndicator(Modifier.size(18.dp),
+                                color = Color.White, strokeWidth = 2.dp)
+                            else Text(stringResource(R.string.confirm), fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    CropGlassTool(Icons.Default.Refresh, stringResource(R.string.rotate_90),
+                        enabled = !isRotating && !isSaving, onClick = {
+                        isRotating = true
+                        coroutineScope.launch {
+                            val animJob = launch {
+                                rotationAngle.animateTo(targetValue = 90f,
+                                    animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing))
+                            }
+                            viewModel.rotateImage {
+                                coroutineScope.launch {
+                                    animJob.join()
+                                    rotationAngle.snapTo(0f)
+                                    isRotating = false
+                                }
                             }
                         }
+                    })
+                    CropGlassTool(Icons.Default.CropFree, stringResource(R.string.full_image),
+                        enabled = !isRotating && !isSaving, onClick = viewModel::resetToFullImage)
+                    CropGlassTool(Icons.Default.AutoFixHigh, stringResource(R.string.auto_detect),
+                        enabled = !isRotating && !isSaving, onClick = viewModel::reDetect,
+                        tint = MaterialTheme.colorScheme.primary)
+                }
+            }
+        },
+        bottomBar = {
+            Column(Modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 24.dp) {
+                    CropRatioStrip(selectedRatio, customRatioValue,
+                        onSelectRatio = viewModel::setAspectRatio, onSelectCustomRatio = viewModel::setCustomRatio,
+                        enabled = !isRotating && !isSaving)
+                }
+                GlassSurface(Modifier.fillMaxWidth(), cornerRadius = 26.dp) {
+                    Row(Modifier.fillMaxWidth().padding(5.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        CropFilterOption(stringResource(R.string.filter_original), Icons.Default.Image,
+                            isSelected = selectedFilter == ImageFilter.ORIGINAL, modifier = Modifier.weight(1f),
+                            enabled = !isRotating && !isSaving, onClick = { viewModel.setFilter(ImageFilter.ORIGINAL) })
+                        CropFilterOption(stringResource(R.string.filter_magic), Icons.Default.AutoAwesome,
+                            isSelected = selectedFilter == ImageFilter.MAGIC_COLOR, modifier = Modifier.weight(1f),
+                            enabled = !isRotating && !isSaving, onClick = { viewModel.setFilter(ImageFilter.MAGIC_COLOR) })
+                        CropFilterOption(stringResource(R.string.filter_bw), Icons.Default.Contrast,
+                            isSelected = selectedFilter == ImageFilter.BW, modifier = Modifier.weight(1f),
+                            enabled = !isRotating && !isSaving, onClick = { viewModel.setFilter(ImageFilter.BW) })
+                        CropFilterOption(stringResource(R.string.filter_grayscale), Icons.Default.FilterBAndW,
+                            isSelected = selectedFilter == ImageFilter.GRAYSCALE, modifier = Modifier.weight(1f),
+                            enabled = !isRotating && !isSaving, onClick = { viewModel.setFilter(ImageFilter.GRAYSCALE) })
                     }
                 }
             }
@@ -271,7 +171,6 @@ fun CropScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
         ) {
             val containerW = constraints.maxWidth.toFloat()
             val containerH = constraints.maxHeight.toFloat()
@@ -343,33 +242,17 @@ fun CropScreen(
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
-                Surface(
-                    color = Color.Black.copy(alpha = 0.65f),
-                    modifier = Modifier.fillMaxSize().padding(20.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            border = BorderStroke(1.dp, PrismCyan.copy(alpha = 0.5f)),
-                            modifier = Modifier.padding(24.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(14.dp)
-                            ) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(24.dp),
-                                    color = PrismCyan,
-                                    strokeWidth = 2.5.dp
-                                )
-                                Text(
-                                    text = stringResource(R.string.processing),
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .18f)),
+                    contentAlignment = Alignment.Center) {
+                    Surface(Modifier.padding(24.dp), shape = RoundedCornerShape(26.dp),
+                        color = MaterialTheme.colorScheme.surface, shadowElevation = 12.dp) {
+                        Row(Modifier.padding(horizontal = 24.dp, vertical = 18.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            CircularProgressIndicator(Modifier.size(24.dp),
+                                color = MaterialTheme.colorScheme.primary, strokeWidth = 2.5.dp)
+                            Text(stringResource(R.string.processing),
+                                color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
                         }
                     }
                 }
@@ -379,10 +262,63 @@ fun CropScreen(
 }
 
 @Composable
-private fun CropFilterChip(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector,
-    isSelected: Boolean, onClick: () -> Unit) {
-    FilterChip(selected = isSelected, onClick = onClick,
-        label = { Text(label) }, leadingIcon = { Icon(icon, null, Modifier.size(16.dp)) })
+private fun CropGlassTool(icon: ImageVector, description: String, onClick: () -> Unit,
+    enabled: Boolean = true, tint: Color = MaterialTheme.colorScheme.onSurface) {
+    GlassSurface(Modifier.size(48.dp), cornerRadius = 24.dp) {
+        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxSize()) {
+            Icon(icon, description, Modifier.size(22.dp), tint = tint.copy(alpha = if (enabled) 1f else .4f))
+        }
+    }
+}
+
+@Composable
+private fun CropFilterOption(label: String, icon: ImageVector, isSelected: Boolean,
+    onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    TextButton(onClick = onClick, enabled = enabled,
+        modifier = modifier.background(if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = .14f)
+            else Color.Transparent, RoundedCornerShape(22.dp)).semantics { selected = isSelected }, shape = RoundedCornerShape(22.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 12.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            val color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+            Icon(icon, null, Modifier.size(20.dp), tint = color.copy(alpha = if (enabled) 1f else .4f))
+            Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                color = color.copy(alpha = if (enabled) 1f else .4f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+@Composable
+private fun CropRatioStrip(selected: AspectRatioPreset, customRatio: Float?,
+    onSelectRatio: (AspectRatioPreset) -> Unit, onSelectCustomRatio: (Float) -> Unit,
+    enabled: Boolean) {
+    var custom by remember { mutableStateOf(false) }
+    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        AspectRatioPreset.entries.forEach { preset ->
+            val active = selected == preset && (preset != AspectRatioPreset.CUSTOM || customRatio == null)
+            TextButton(onClick = { onSelectRatio(preset) }, enabled = enabled,
+                modifier = Modifier.background(if (active) MaterialTheme.colorScheme.primary.copy(alpha = .14f)
+                    else Color.Transparent, CircleShape).semantics { this.selected = active }, shape = CircleShape,
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) {
+                Text(stringResource(if (preset == AspectRatioPreset.CUSTOM) R.string.ratio_free else preset.titleRes),
+                    color = (if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                        .copy(alpha = if (enabled) 1f else .4f), fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
+            }
+        }
+        val customActive = selected == AspectRatioPreset.CUSTOM && customRatio != null
+        TextButton(onClick = { custom = true }, enabled = enabled, shape = CircleShape,
+            modifier = Modifier.background(if (customActive) MaterialTheme.colorScheme.primary.copy(alpha = .14f)
+                else Color.Transparent, CircleShape).semantics { this.selected = customActive },
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)) {
+            Text(stringResource(R.string.ratio_custom),
+                color = (if (customActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                    .copy(alpha = if (enabled) 1f else .4f), fontWeight = if (customActive) FontWeight.SemiBold else FontWeight.Medium)
+        }
+    }
+    if (custom) CustomRatioDialog(customRatio, { custom = false }) {
+        custom = false
+        onSelectCustomRatio(it)
+    }
 }
 
 private fun getUprightDimensions(path: String): Pair<Float, Float> {
