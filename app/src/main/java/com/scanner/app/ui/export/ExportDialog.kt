@@ -42,6 +42,7 @@ fun ExportDialog(
     LaunchedEffect(Unit) { viewModel.resetState() }
 
     AlertDialog(
+        containerColor = MaterialTheme.colorScheme.surface,
         onDismissRequest = { if (exportState !is ExportState.Exporting) onDismiss() },
         title = {
             Text(

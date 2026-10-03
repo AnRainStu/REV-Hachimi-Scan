@@ -224,8 +224,8 @@ fun CameraScreen(onNavigateToReview: () -> Unit, onNavigateToCrop: (String) -> U
                     }
                 }
                 Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    CameraSideAction(Icons.Default.CollectionsBookmark, stringResource(R.string.review_with_count, count),
-                        onClick = onNavigateToReview, enabled = !busy)
+                    CameraSideAction(Icons.Default.CollectionsBookmark, stringResource(R.string.review),
+                        onClick = onNavigateToReview, enabled = !busy, badgeCount = count)
                 }
             }
             if (busy) GlassSurface(dark = true, cornerRadius = 20.dp) {
@@ -266,13 +266,20 @@ private fun CameraGlassIcon(icon: ImageVector, description: String, onClick: () 
 }
 
 @Composable
-private fun CameraSideAction(icon: ImageVector, label: String, onClick: () -> Unit, enabled: Boolean) {
+private fun CameraSideAction(icon: ImageVector, label: String, onClick: () -> Unit, enabled: Boolean, badgeCount: Int? = null) {
+    val description = if (badgeCount != null) stringResource(R.string.review_with_count, badgeCount) else label
     GlassSurface(Modifier.widthIn(min = 72.dp, max = 112.dp), dark = true, cornerRadius = 26.dp) {
-        TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth(),
+        TextButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().semantics { contentDescription = description },
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 12.dp)) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 val color = Color.White.copy(alpha = if (enabled) 1f else .4f)
-                Icon(icon, null, Modifier.size(22.dp), tint = color)
+                Box {
+                    Icon(icon, null, Modifier.size(22.dp), tint = color)
+                    if (badgeCount != null && badgeCount > 0) Badge(Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-6).dp),
+                        containerColor = Color(0xFF005ACB), contentColor = Color.White) {
+                        Text(if (badgeCount > 99) "99+" else badgeCount.toString())
+                    }
+                }
                 Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Medium,
                     color = color, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }

@@ -4,6 +4,8 @@
 
 The library uses a large title and an adaptive grid of paper document previews. Navigation, selection, scan and export are separate floating controls. Preview and crop tools use compact filter and aspect selections; camera controls float independently around the full-screen viewfinder. Library content can scroll beneath these controls while document cards keep opaque paper surfaces.
 
+The status edge fades scrolling content away from system icons. Brand and primary tool surfaces defocus background lettering with an 8 dp Gaussian pass before edge refraction, while small clear navigation controls retain more detail. Scan/export controls are centered, and narrow layouts show the app mark without a truncated brand name; the camera's page count uses a badge beside the review icon.
+
 `GlassScaffold` records the Compose content plane with `rememberGraphicsLayer`; glass controls sample it in their local coordinates. On API 33+, a GPU shader refracts the sampled image near each control's rounded edge and applies light diffusion. API 31/32 uses backdrop blur. Foreground labels and icons are drawn afterwards and excluded from the recorded plane, avoiding recursive feedback and blurred text. Older systems and the native CameraX viewfinder use a tinted fallback; the camera's native preview is not captured for refraction. There are no continuously animated light effects or per-frame bitmap readbacks.
 
 Reduce transparency is persisted in settings and switches glass controls to solid surfaces. Battery saver also skips optical effects. Glass action buttons scale to 0.97 while pressed with a 120 ms response; system animation scaling is respected, including disabled animations. Controls retain native focus, touch semantics and readable foreground colors.

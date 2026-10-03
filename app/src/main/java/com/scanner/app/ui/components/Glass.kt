@@ -56,6 +56,8 @@ fun GlassScaffold(
     var bottomHeight by remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val navigationInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val statusInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val edgeColor = MaterialTheme.colorScheme.background
     CompositionLocalProvider(LocalBackdrop provides backdrop) {
         Box(modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()
@@ -67,6 +69,11 @@ fun GlassScaffold(
                 GlassCanvas()
                 content(PaddingValues(top = with(density) { topHeight.toDp() },
                     bottom = maxOf(navigationInset, with(density) { bottomHeight.toDp() })))
+                // Scrolling paper must not compete with the system time and status icons.
+                Canvas(Modifier.fillMaxWidth().height(statusInset + 12.dp)) {
+                    drawRect(Brush.verticalGradient(0f to edgeColor, .67f to edgeColor,
+                        1f to edgeColor.copy(alpha = 0f)))
+                }
             }
             Box(Modifier.align(Alignment.TopCenter).fillMaxWidth().onSizeChanged { topHeight = it.height }) { topBar() }
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { bottomHeight = it.height }) { bottomBar() }
@@ -227,7 +234,13 @@ private class LiquidLens {
         shader.setFloatUniform("density", density)
         shader.setFloatUniform("diffusion", if (strong) 2.4f else 1.25f)
         shader.setFloatUniform("materialDark", if (dark) 1f else 0f)
-        return AndroidRenderEffect.createRuntimeShaderEffect(shader, "backdrop").asComposeRenderEffect()
+        val refracted = AndroidRenderEffect.createRuntimeShaderEffect(shader, "backdrop")
+        return if (strong) {
+            // Defocus text before bending the edge; a few point samples leave doubled letters.
+            val blur = AndroidRenderEffect.createBlurEffect(8f * density, 8f * density,
+                android.graphics.Shader.TileMode.CLAMP)
+            AndroidRenderEffect.createChainEffect(refracted, blur).asComposeRenderEffect()
+        } else refracted.asComposeRenderEffect()
     }
 }
 

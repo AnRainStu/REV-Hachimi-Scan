@@ -19,6 +19,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -64,9 +65,17 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
         if (page == null) GlassScaffold(topBar = {
             Row(Modifier.statusBarsPadding().padding(horizontal = 24.dp, vertical = 12.dp).fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Icon(Icons.Default.DocumentScanner, null, Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                BoxWithConstraints(Modifier.weight(1f)) {
+                    val showName = maxWidth >= 148.dp * LocalDensity.current.fontScale
+                    GlassSurface(cornerRadius = 26.dp, strong = true) {
+                        Row(Modifier.heightIn(min = 52.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.DocumentScanner, if (showName) null else stringResource(R.string.app_name),
+                                Modifier.size(22.dp), tint = MaterialTheme.colorScheme.primary)
+                            if (showName) Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
                 }
                 if (pages.isNotEmpty()) GlassButton(onClick = { selecting = !selecting; selected.clear() }, enabled = !busy,
                     contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)) {
@@ -77,7 +86,7 @@ fun ReviewScreen(onNavigateToCamera: () -> Unit, onNavigateToCrop: (String) -> U
                 }
             }
         }, bottomBar = {
-            Column(Modifier.navigationBarsPadding().padding(horizontal = 24.dp, vertical = 14.dp),
+            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 14.dp),
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (selecting) GlassSurface(strong = true, cornerRadius = 26.dp, modifier = Modifier.fillMaxWidth()) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
