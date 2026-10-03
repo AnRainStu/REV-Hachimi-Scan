@@ -59,8 +59,8 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
-          # Use GLES software rendering rather than the deprecated indirect Vulkan path.
-          emulator-options: -no-window -gpu swiftshader -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
+          # Render headless GLES through ANGLE instead of the legacy SwiftShader GLES library.
+          emulator-options: -no-window -gpu swangle -no-snapshot -noaudio -no-boot-anim -feature -Vulkan
           ram-size: 2048M
           disable-animations: true
           script: |
