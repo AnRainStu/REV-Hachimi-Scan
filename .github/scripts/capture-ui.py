@@ -142,12 +142,8 @@ def toggle_transparency(expected):
     assert switch.get('checked') == str(expected).lower(), 'Transparency preference did not update'
 
 
-def background_samples(png):
-    """Decode ordinary Android 8-bit RGB/RGBA PNGs with the standard library only.
-
-    Sample narrow outer margins below the toolbar and above the dock, avoiding clocks,
-    document/text content, and controls. Unsupported PNGs still remain useful artifacts.
-    """
+def decode_png(png):
+    """Decode ordinary Android 8-bit RGB/RGBA screenshots without extra dependencies."""
     if not png.startswith(b'\x89PNG\r\n\x1a\n'):
         raise ValueError('Not a PNG')
     compressed = bytearray()
@@ -171,7 +167,7 @@ def background_samples(png):
     if len(decoded) != (stride + 1) * height:
         raise ValueError('Unexpected PNG row size')
     previous = bytearray(stride)
-    values = []
+    rows = []
     for y in range(height):
         start = y * (stride + 1)
         mode = decoded[start]
@@ -194,11 +190,119 @@ def background_samples(png):
                     a, b, c = abs(p - left), abs(p - above), abs(p - upper_left)
                     predictor = left if a <= b and a <= c else above if b <= c else upper_left
                 row[i] = (row[i] + predictor) & 255
-        if 120 <= y < height - 120 and y % 4 == 0:
-            for x in (4, 8, 12, width - 13, width - 9, width - 5):
-                values.extend(row[x * channels:x * channels + 3])
+        rows.append(row)
         previous = row
+    return width, height, channels, rows
+
+
+def background_samples(png):
+    # Narrow margins avoid clocks, document content and controls.
+    width, height, channels, rows = decode_png(png)
+    values = []
+    for y in range(120, height - 120, 4):
+        for x in (4, 8, 12, width - 13, width - 9, width - 5):
+            values.extend(rows[y][x * channels:x * channels + 3])
     return (width, height), values
+
+
+def document_pixels(png):
+    # Center of the colored coastal illustration, away from controls, handles and glass.
+    width, height, channels, rows = decode_png(png)
+    return [tuple(rows[y][x * channels:x * channels + 3])
+            for y in range(round(height * .42), round(height * .56), 3)
+            for x in range(round(width * .4), round(width * .6), 3)]
+
+
+def pixel_delta(left, right):
+    assert len(left) == len(right) and left, 'Document sample sizes changed'
+    return sum(abs(a - b) for l, r in zip(left, right) for a, b in zip(l, r)) / (3 * len(left))
+
+
+def chroma(pixels):
+    return sum(max(p) - min(p) for p in pixels) / len(pixels)
+
+
+def await_preview(name, predicate):
+    # A native worker can finish after the tap; inspect its pixels instead of a fixed delay.
+    deadline = time.monotonic() + 15
+    while True:
+        png = adb('exec-out', 'screencap', '-p')
+        pixels = document_pixels(png)
+        if predicate(pixels):
+            (output / f'{name}.png').write_bytes(png)
+            return pixels
+        assert time.monotonic() < deadline, f'{name}: expected document pixels never appeared'
+        time.sleep(.2)
+
+
+def scan_files():
+    return set(adb('shell', 'run-as', 'moe.hachimi.cam', 'ls', 'files/scans').decode().split())
+
+
+def check_fresh_crop_filters():
+    # Page 2 is deliberately unprocessed, matching the state immediately after capture.
+    source_args = ('exec-out', 'run-as', 'moe.hachimi.cam', 'cat', 'files/scans/fixture-coast-original.jpg')
+    source_before, files_before = adb(*source_args), scan_files()
+    tap('Page 2')
+    tap('Adjust Boundary')
+    tap('Original')
+    original = await_preview('crop-filter-original', lambda p: chroma(p) > 20)
+    previews = {}
+    for label in ('Magic', 'B&W', 'Gray'):
+        tap(label)
+        pixels = await_preview(f'crop-filter-{label.lower().replace("&", "")}',
+            lambda p: pixel_delta(original, p) > 4 and (label == 'Magic' or chroma(p) < 1)
+            and (label != 'Magic' or chroma(p) > 10)
+            and (label != 'B&W' or sum(min(rgb) > 250 for rgb in p) > len(p) / 2)
+            and (label != 'Gray' or sum(20 < min(rgb) <= max(rgb) < 220 for rgb in p) > len(p) / 2)
+            and (label != 'Gray' or pixel_delta(previews['B&W'], p) > 3))
+        previews[label] = pixels
+        print(f'Fresh crop {label}: document RGB delta={pixel_delta(original, pixels):.3f}, chroma={chroma(pixels):.3f}', flush=True)
+    tap('Original')
+    await_preview('crop-filter-restored', lambda p: pixel_delta(original, p) < .1)
+
+    # Rapid taps must leave the last selected filter on screen, without cumulative filtering.
+    state = snapshot()
+    for label in ('Magic', 'B&W', 'Original', 'Gray'):
+        x1, y1, x2, y2 = locate(label, state, control=True)
+        adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
+    await_preview('crop-filter-rapid-gray', lambda p: pixel_delta(previews['Gray'], p) < .1)
+    state = snapshot()
+    selected = next(node for node in state[0] if node.get('text') == 'Gray')
+    while selected.get('selected') != 'true' and selected in state[1]:
+        selected = state[1][selected]
+    assert selected.get('selected') == 'true', 'Rapid switching did not select the final Gray filter'
+    tap('Cancel')
+    deadline = time.monotonic() + 5
+    while scan_files() != files_before:
+        assert time.monotonic() < deadline, 'Cancel persisted a preview or left a draft'
+        time.sleep(.2)
+    assert adb(*source_args) == source_before, 'Filter preview changed the original capture'
+
+    # Confirm must commit the same grayscale effect that was previewed.
+    tap('Page 2')
+    tap('Adjust Boundary')
+    tap('Gray')
+    await_preview('crop-filter-confirm-gray', lambda p: pixel_delta(previews['Gray'], p) < .1)
+    tap('Confirm')
+    deadline = time.monotonic() + 15
+    while True:
+        try:
+            locate('My scans')
+            break
+        except AssertionError:
+            assert time.monotonic() < deadline, 'Crop confirmation did not finish'
+            time.sleep(.2)
+    assert adb(*source_args) == source_before, 'Confirm changed the original capture'
+    files_after = scan_files()
+    assert files_before <= files_after, 'Confirm removed an unrelated scan file'
+    assert len(files_after - files_before) == 1, 'Confirm must save one processed result'
+    tap('Page 2')
+    locate('Page 2')
+    locate('Adjust Boundary', control=True)
+    await_preview('editor-confirmed-gray', lambda p: chroma(p) < 1
+        and sum(max(rgb) < 180 for rgb in p) > len(p) / 5)
+    tap('Close')
 
 
 def ambient_pair(prefix, interval):
@@ -311,6 +415,8 @@ capture('editor', 'Adjust Boundary', ('Adjust Boundary', 'Rotate', 'Close'))
 tap('Adjust Boundary')
 capture('crop', 'Cancel', ('Cancel', 'Confirm'))
 back()
+check_fresh_crop_filters()
+
 tap('Export')
 capture('export', 'Close', ('Close',))
 back()

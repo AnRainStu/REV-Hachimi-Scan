@@ -35,6 +35,7 @@ class CropViewModel : ViewModel() {
     private val _error = MutableStateFlow<String?>(null)
     val error = _error.asStateFlow()
     fun dismissError() { _error.value = null }
+    fun reportPreviewError(message: String) { _error.value = message }
 
     private val _imagePath = MutableStateFlow<String?>(null)
     val imagePath: StateFlow<String?> = _imagePath.asStateFlow()
@@ -73,17 +74,26 @@ class CropViewModel : ViewModel() {
 
     private var lsdJob: Job? = null
 
-    fun onBitmapLoaded(bitmap: Bitmap) {
+    fun onBitmapLoaded(bitmap: Bitmap, originalWidth: Float = bitmap.width.toFloat(), originalHeight: Float = bitmap.height.toFloat()) {
         lsdJob?.cancel()
         lsdJob = viewModelScope.launch {
             try {
                 val (hLines, vLines) = withContext(Dispatchers.Default) {
-                    com.scanner.app.engine.NativeEdgeDetector().detectStructuralLines(bitmap)
+                    val (horizontal, vertical) = com.scanner.app.engine.NativeEdgeDetector().detectStructuralLines(bitmap)
+                    // Native segments use preview pixels; handles and snapping use full original pixels.
+                    val scaleX = originalWidth / bitmap.width
+                    val scaleY = originalHeight / bitmap.height
+                    fun originalCoordinates(lines: FloatArray) = FloatArray(lines.size) { index ->
+                        lines[index] * if (index % 2 == 0) scaleX else scaleY
+                    }
+                    originalCoordinates(horizontal) to originalCoordinates(vertical)
                 }
                 _horizontalLines.value = hLines
                 _verticalLines.value = vLines
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
-                e.printStackTrace()
+                _error.value = e.message ?: "Cannot detect the crop image's structure"
             }
         }
     }

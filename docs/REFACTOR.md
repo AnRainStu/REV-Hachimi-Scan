@@ -1,6 +1,6 @@
 # Refactor notes
 
-## Glass interface (0.4.1)
+## Glass interface (0.4.2)
 
 The library uses a large title and an adaptive grid of paper document previews. Navigation, selection, scan and export are separate floating controls. Preview and crop tools use compact filter and aspect selections; camera controls float independently around the full-screen viewfinder. Library content can scroll beneath these controls while document cards keep opaque paper surfaces.
 
@@ -21,6 +21,8 @@ CI seeds six upright document fixtures, navigates by accessibility labels and bo
 `DocumentProcessor` validates geometry, rotates the source, warps and filters, applies output rotation and saves a unique result. `PageEditor` serializes crop/review work and reads the current record inside the edit lock. Failed edits preserve the committed metadata and output.
 
 `CropViewModel` keeps local geometry, filter and aspect choices. Draft rotation changes `sourceRotation`; review rotation changes `rotation`. Crop geometry is measured after source rotation. Neither operation modifies the original JPEG.
+
+Crop filter selection immediately renders a bounded bitmap preview through the same native filter implementation used by `DocumentProcessor`. Filter work is independent of source decoding and structural-line detection, retains the source dimensions for crop geometry, and never writes into the draft or original. Superseded preview requests cannot publish stale results. Only Confirm commits a full-resolution rendered output; Cancel leaves saved pixels and metadata unchanged. CI exercises a colored, unprocessed capture-style fixture, all filters, restoration to Original, rapid switching, cancellation and grayscale confirmation.
 
 `CameraPreview` owns CameraX binding and the executor. `CameraViewModel` coordinates capture and import. Final images are normalized to upright JPEGs and detected independently of preview coordinates.
 

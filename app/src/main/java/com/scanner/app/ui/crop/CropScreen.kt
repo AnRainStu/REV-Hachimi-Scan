@@ -42,12 +42,19 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.scanner.app.ui.components.GlassScaffold
 import com.scanner.app.ui.components.GlassSurface
 import com.scanner.app.R
+import com.scanner.app.data.image.CropFilterPreview
 import com.scanner.app.domain.model.AspectRatioPreset
 import com.scanner.app.domain.model.ImageFilter
 import com.scanner.app.ui.components.CustomRatioDialog
 import java.io.File
 import kotlin.math.max
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +80,88 @@ fun CropScreen(
     val error by viewModel.error.collectAsState()
     var isSaving by remember { mutableStateOf(false) }
 
+    val requestedPath = imagePath
+    val requestedVersion = imageVersion
+    var sourceLoading by remember(imagePath, imageVersion) { mutableStateOf(imagePath != null) }
+    val sourcePreview by produceState<CropSourcePreview?>(null, requestedPath, requestedVersion) {
+        value = null
+        var loaded: Bitmap? = null
+        try {
+            val path = requestedPath ?: return@produceState
+            val source = withContext(Dispatchers.IO) {
+                val dimensions = getUprightDimensions(path)
+                check(dimensions.first > 0f && dimensions.second > 0f) { "Cannot read the crop image's dimensions" }
+                val original = checkNotNull(loadUprightBitmap(path)) { "Cannot load the crop image" }
+                loaded = original
+                CropSourcePreview(path, requestedVersion, dimensions.first, dimensions.second, original)
+            }
+            ensureActive()
+            if (viewModel.imagePath.value != source.path || viewModel.imageVersion.value != source.version) return@produceState
+            value = source
+            loaded = null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            ensureActive()
+            if (viewModel.imagePath.value == requestedPath && viewModel.imageVersion.value == requestedVersion) {
+                viewModel.reportPreviewError(failure.message ?: "Cannot load the crop image")
+            }
+        } finally {
+            loaded?.recycle()
+            sourceLoading = false
+        }
+    }
+    val source = sourcePreview?.takeIf { it.path == imagePath && it.version == imageVersion }
+    val sourceBitmap = source?.bitmap
+    val origW = source?.width ?: 0f
+    val origH = source?.height ?: 0f
+
+    // Detection and crop coordinates always come from the upright, unfiltered source.
+    LaunchedEffect(sourceBitmap) {
+        if (sourceBitmap != null) {
+            viewModel.onBitmapLoaded(sourceBitmap, origW, origH)
+        }
+    }
+
+    val previewMutex = remember { Mutex() }
+    val requestedFilter = selectedFilter
+    var previewRendering by remember(sourceBitmap, selectedFilter) { mutableStateOf(sourceBitmap != null) }
+    val filteredPreview by produceState<CropRenderedPreview?>(null, sourceBitmap, selectedFilter) {
+        value = value?.takeIf { it.source === sourceBitmap }
+        var rendered: Bitmap? = null
+        try {
+            val expectedSource = source ?: return@produceState
+            val original = expectedSource.bitmap
+            withContext(Dispatchers.Default) {
+                // Native work cannot be interrupted mid-call; cancelled queued requests do not run.
+                previewMutex.withLock {
+                    ensureActive()
+                    rendered = CropFilterPreview.render(original, requestedFilter)
+                    ensureActive()
+                }
+            }
+            ensureActive()
+            if (viewModel.selectedFilter.value != requestedFilter ||
+                viewModel.imagePath.value != expectedSource.path ||
+                viewModel.imageVersion.value != expectedSource.version) return@produceState
+            value = CropRenderedPreview(original, requestedFilter, checkNotNull(rendered))
+            rendered = null
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (failure: Exception) {
+            ensureActive()
+            if (viewModel.selectedFilter.value == requestedFilter &&
+                viewModel.imagePath.value == source?.path && viewModel.imageVersion.value == source?.version) {
+                viewModel.reportPreviewError(failure.message ?: "Cannot render the filter preview")
+            }
+        } finally {
+            // Published bitmaps remain owned by Compose; only obsolete unpublished output is recycled.
+            rendered?.recycle()
+            previewRendering = false
+        }
+    }
+    val bitmap = filteredPreview?.takeIf { it.source === sourceBitmap }?.bitmap ?: sourceBitmap
+
     val coroutineScope = rememberCoroutineScope()
     val rotationAngle = remember { Animatable(0f) }
     var isRotating by remember { mutableStateOf(false) }
@@ -95,7 +184,7 @@ fun CropScreen(
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     GlassSurface(cornerRadius = 24.dp, tint = Color(0xFF005ACB), strong = true,
                         contentColor = Color.White) {
-                        TextButton(enabled = !isSaving && !isRotating,
+                        TextButton(enabled = !isSaving && !isRotating && sourceBitmap != null,
                             onClick = {
                                 isSaving = true
                                 viewModel.confirmCrop { success ->
@@ -175,26 +264,12 @@ fun CropScreen(
             val containerW = constraints.maxWidth.toFloat()
             val containerH = constraints.maxHeight.toFloat()
 
-            val preview by produceState<Pair<Pair<Float, Float>, Bitmap?>?>(null, imagePath, imageVersion) {
-                value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                    imagePath?.let { getUprightDimensions(it) to loadUprightBitmap(it) }
-                }
-            }
-            val (origW, origH) = preview?.first ?: Pair(0f, 0f)
-            val bitmap = preview?.second
-
-            LaunchedEffect(bitmap) {
-                if (bitmap != null) {
-                    viewModel.onBitmapLoaded(bitmap)
-                }
-            }
-
             // Continuous rotation scale compensation:
             // When rotating 90 deg, fit the rotated aspect ratio without clipping or layout jumping
-            val targetScale = remember(bitmap, containerW, containerH) {
-                if (bitmap != null && bitmap.width > 0 && bitmap.height > 0 && containerW > 0 && containerH > 0) {
-                    val bw = bitmap.width.toFloat()
-                    val bh = bitmap.height.toFloat()
+            val targetScale = remember(sourceBitmap, containerW, containerH) {
+                if (sourceBitmap != null && sourceBitmap.width > 0 && sourceBitmap.height > 0 && containerW > 0 && containerH > 0) {
+                    val bw = sourceBitmap.width.toFloat()
+                    val bh = sourceBitmap.height.toFloat()
                     val sOrig = kotlin.math.min(containerW / bw, containerH / bh)
                     val sRot = kotlin.math.min(containerW / bh, containerH / bw)
                     if (sOrig > 0f) sRot / sOrig else 1.0f
@@ -235,6 +310,19 @@ fun CropScreen(
                     },
                     modifier = Modifier.fillMaxSize().padding(20.dp)
                 )
+            }
+
+            if ((sourceLoading || previewRendering) && !isSaving) {
+                Surface(Modifier.align(Alignment.BottomCenter).padding(bottom = 28.dp),
+                    shape = RoundedCornerShape(22.dp), color = MaterialTheme.colorScheme.surface,
+                    shadowElevation = 4.dp) {
+                    Row(Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Text(stringResource(R.string.processing), style = MaterialTheme.typography.labelMedium)
+                    }
+                }
             }
 
             AnimatedVisibility(
@@ -321,6 +409,9 @@ private fun CropRatioStrip(selected: AspectRatioPreset, customRatio: Float?,
     }
 }
 
+private data class CropSourcePreview(val path: String, val version: Int, val width: Float, val height: Float, val bitmap: Bitmap)
+private data class CropRenderedPreview(val source: Bitmap, val filter: ImageFilter, val bitmap: Bitmap)
+
 private fun getUprightDimensions(path: String): Pair<Float, Float> {
     val f = File(path)
     if (!f.exists()) return Pair(0f, 0f)
@@ -339,7 +430,7 @@ private fun getUprightDimensions(path: String): Pair<Float, Float> {
     }
 }
 
-private fun loadUprightBitmap(path: String, maxDimension: Int = 4096): Bitmap? {
+private fun loadUprightBitmap(path: String, maxDimension: Int = 1600): Bitmap? {
     val f = File(path)
     if (!f.exists()) return null
     val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -348,7 +439,7 @@ private fun loadUprightBitmap(path: String, maxDimension: Int = 4096): Bitmap? {
 
     var inSampleSize = 1
     val maxSide = max(boundsOpts.outWidth, boundsOpts.outHeight)
-    while ((maxSide / inSampleSize) > maxDimension) {
+    while (maxSide.toLong() > maxDimension.toLong() * inSampleSize) {
         inSampleSize *= 2
     }
 

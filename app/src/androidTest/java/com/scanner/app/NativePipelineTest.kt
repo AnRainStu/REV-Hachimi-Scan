@@ -74,11 +74,14 @@ class NativePipelineTest {
                 sample.recycle()
             }
             originals[fixture] = fixture.readBytes()
-            val sample = processor.process(ScannedPage(
+            val raw = ScannedPage(
                 id = "fixture-$key", originalImagePath = fixture.absolutePath,
-                filter = ImageFilter.ORIGINAL,
+                filter = if (key == "coast") ImageFilter.MAGIC_COLOR else ImageFilter.ORIGINAL,
                 createdAt = System.currentTimeMillis() - index * 24 * 60 * 60 * 1000L
-            ))
+            )
+            // A fresh capture has only an original and a selected filter, no rendered result.
+            // Keep this colored page in that state for the crop-preview UI regression.
+            val sample = if (key == "coast") raw else processor.process(raw)
             val rendered = android.graphics.BitmapFactory.decodeFile(sample.imagePath)
             assertNotNull(rendered)
             assertTrue("Fixture must be portrait: $key", rendered.height > rendered.width)
