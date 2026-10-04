@@ -239,6 +239,17 @@ def scan_files():
     return set(adb('shell', 'run-as', 'moe.hachimi.cam', 'ls', 'files/scans').decode().split())
 
 
+def assert_filter_checked(label):
+    state = snapshot()
+    for option in ('Original', 'Magic', 'B&W', 'Gray'):
+        control = next(node for node in state[0] if node.get('text') == option)
+        while control.get('checkable') != 'true' and control in state[1]:
+            control = state[1][control]
+        # Compose exposes non-tab Selected semantics as a checkable/checked node.
+        assert control.get('checkable') == 'true', f'{option} lost its filter choice semantics'
+        assert control.get('checked') == str(option == label).lower(), f'Expected only {label} to be checked'
+
+
 def check_fresh_crop_filters():
     # Page 2 is deliberately unprocessed, matching the state immediately after capture.
     source_args = ('exec-out', 'run-as', 'moe.hachimi.cam', 'cat', 'files/scans/fixture-coast-original.jpg')
@@ -267,11 +278,7 @@ def check_fresh_crop_filters():
         x1, y1, x2, y2 = locate(label, state, control=True)
         adb('shell', 'input', 'tap', str((x1 + x2) // 2), str((y1 + y2) // 2))
     await_preview('crop-filter-rapid-gray', lambda p: pixel_delta(previews['Gray'], p) < .1)
-    state = snapshot()
-    selected = next(node for node in state[0] if node.get('text') == 'Gray')
-    while selected.get('selected') != 'true' and selected in state[1]:
-        selected = state[1][selected]
-    assert selected.get('selected') == 'true', 'Rapid switching did not select the final Gray filter'
+    assert_filter_checked('Gray')
     tap('Cancel')
     deadline = time.monotonic() + 5
     while scan_files() != files_before:
@@ -282,6 +289,7 @@ def check_fresh_crop_filters():
     # Confirm must commit the same grayscale effect that was previewed.
     tap('Page 2')
     tap('Adjust Boundary')
+    assert_filter_checked('Magic')  # Cancel did not persist the previous Gray choice.
     tap('Gray')
     await_preview('crop-filter-confirm-gray', lambda p: pixel_delta(previews['Gray'], p) < .1)
     tap('Confirm')
