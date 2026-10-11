@@ -2,6 +2,8 @@
 
 基于 [eviau512/Hachimi-Scan](https://github.com/eviau512/Hachimi-Scan) 的 Android 本地文档扫描器重构版，保留项目历史、Kotlin、Compose、CameraX 与 OpenCV 技术栈。
 
+Agent 接手入口：[仓库工作约定](AGENTS.md) · [项目对接文档](docs/AGENT_HANDOFF.md)。
+
 ## 改动
 
 - 0.4.2 界面使用大标题、自适应纸张文档网格和独立悬浮玻璃操作；扫描与导出分别呈现，编辑使用紧凑的滤镜和比例选择。保留批量编辑、排序和删除确认。无相机权限仍可查看或导入图片。

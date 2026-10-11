@@ -4,6 +4,8 @@ Refactored offline Android document scanner based on [eviau512/Hachimi-Scan](htt
 
 [简体中文](README_zh.md) · [Builds and checks](https://github.com/AnRainStu/REV-Hachimi-Scan/actions)
 
+For agents and maintainers: [repository guide](AGENTS.md) · [project handoff (中文)](docs/AGENT_HANDOFF.md).
+
 ## Changes
 
 - The 0.4.2 interface uses large titles, an adaptive grid of paper document previews and separate floating glass controls. Scan and export stay distinct; editing tools use compact filter and aspect selections. Batch editing, ordering and deletion confirmation remain available. Camera permission is needed only for shooting.
